@@ -1,5 +1,5 @@
 """
-2d UNet copied from stable diffusion.
+3d UNet modified from stable diffusion.
 """
 
 import math
@@ -10,6 +10,36 @@ import torch
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+
+from einops import rearrange
+
+
+class InterTrackAttention(nn.Module):
+    def __init__(
+        self,
+        d_intertrack_encoder,
+        n_intertrack_head,
+        d_intertrack_ff,
+        num_intertrack_encoder_layers,
+    ):
+        super().__init__()
+        encoder = nn.TransformerEncoderLayer(
+            d_model=d_intertrack_encoder,
+            nhead=n_intertrack_head,
+            dim_feedforward=d_intertrack_ff,
+            batch_first=True,
+        )
+        self.attention = nn.TransformerEncoder(
+            encoder, num_layers=num_intertrack_encoder_layers
+        )
+
+    def forward(self, input_tensor):
+        """
+        Input: a tensor of shape (N, L, C)
+        Output: a tensor of shape (N, L, C)
+        """
+        output_tensor = input_tensor + self.attention(input_tensor)
+        return output_tensor
 
 
 class SpatialTransformer(nn.Module):
@@ -337,6 +367,9 @@ class UNetModel(nn.Module):
         attention_levels: List[int],
         channel_multipliers: List[int],
         n_heads: int,
+        n_intertrack_head: int,
+        num_intertrack_encoder_layers: int,
+        intertrack_attention_levels: List[int],
         tf_layers: int = 1,
         d_cond: int = 768,
     ):
@@ -390,6 +423,19 @@ class UNetModel(nn.Module):
                     layers.append(
                         SpatialTransformer(channels, n_heads, tf_layers, d_cond)
                     )
+
+                # Add intertrack attention
+
+                if i in intertrack_attention_levels:
+                    layers.append(
+                        InterTrackAttention(
+                            d_intertrack_encoder=channels,
+                            n_intertrack_head=n_intertrack_head,
+                            d_intertrack_ff=2 * channels,
+                            num_intertrack_encoder_layers=num_intertrack_encoder_layers,
+                        )
+                    )
+
                 # Add them to the input half of the U-Net and keep track of the number of channels of
                 # its output
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
@@ -428,6 +474,16 @@ class UNetModel(nn.Module):
                     layers.append(
                         SpatialTransformer(channels, n_heads, tf_layers, d_cond)
                     )
+
+                if i in intertrack_attention_levels:
+                    layers.append(
+                        InterTrackAttention(
+                            d_intertrack_encoder=channels,
+                            n_intertrack_head=n_intertrack_head,
+                            d_intertrack_ff=2 * channels,
+                            num_intertrack_encoder_layers=num_intertrack_encoder_layers,
+                        )
+                    )
                 # Up-sample at every level after last residual block
                 # except the last one.
                 # Note that we are iterating in reverse; i.e. `i == 0` is the last.
@@ -442,6 +498,29 @@ class UNetModel(nn.Module):
             nn.SiLU(),
             nn.Conv2d(channels, out_channels, 3, padding=1),
         )
+
+    def load_polyffusion_checkpoints(self, polyffusion_checkpoints: dict):
+        print("---------------loading polyffusion weights-------------------")
+
+        # first zero out all parameters
+        for params in self.parameters():
+            params.data.fill_(0.0)
+        # then load polyffusion checkpoints
+        unet_from_polyffusion_state_dict = {
+            k.removeprefix("ldm.eps_model."): v
+            for k, v in polyffusion_checkpoints.items()
+            if k.removeprefix("ldm.eps_model.") in self.state_dict()
+        }
+        missing_keys, _ = self.load_state_dict(
+            unet_from_polyffusion_state_dict, strict=False
+        )
+
+        for key in missing_keys:
+            print(key)
+        print(
+            "---------------polyffusion weights loaded with the above missing keys-------------------"
+        )
+        print("It is expected that missing keys are all intertrack attention modules")
 
     def time_step_embedding(self, time_steps: torch.Tensor, max_period: int = 10000):
         """
@@ -465,7 +544,7 @@ class UNetModel(nn.Module):
 
     def forward(self, x: torch.Tensor, time_steps: torch.Tensor, cond: torch.Tensor):
         """
-        :param x: is the input feature map of shape `[batch_size, channels, width, height]`
+        :param x: is the input feature map of shape `[batch_size, track_num, channels, width, height]`
         :param time_steps: are the time steps of shape `[batch_size]`
         :param cond: conditioning of shape `[batch_size, n_cond, d_cond]`
         """
@@ -501,12 +580,25 @@ class TimestepEmbedSequential(nn.Sequential):
 
     def forward(self, x, t_emb, cond=None):
         for layer in self:
-            if isinstance(layer, ResBlock):
-                x = layer(x, t_emb)
-            elif isinstance(layer, SpatialTransformer):
-                x = layer(x, cond)
-            else:
+
+            if isinstance(layer, InterTrackAttention):
+                b, t, c, w, h = x.shape
+                x = rearrange(x, "b t c w h -> (b w h) t c")
                 x = layer(x)
+                x = rearrange(x, "(b w h) t c -> b t c w h", b=b, w=w, h=h)
+            else:
+                b, t = x.shape[0], x.shape[1]
+                x = rearrange(x, "b t c w h -> (b t) c w h")
+                if isinstance(layer, ResBlock):
+                    x = layer(x, t_emb)
+
+                elif isinstance(layer, SpatialTransformer):
+                    x = layer(x, cond)
+
+                else:
+                    x = layer(x)
+                x = rearrange(x, "(b t) c w h -> b t c w h", b=b, t=t)
+
         return x
 
 
