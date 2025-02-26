@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from einops import rearrange
 
 
+# ----------------InterTrackModule---------------- #
 class InterTrackAttention(nn.Module):
     def __init__(
         self,
@@ -40,6 +41,9 @@ class InterTrackAttention(nn.Module):
         """
         output_tensor = input_tensor + self.attention(input_tensor)
         return output_tensor
+
+
+# ----------------IntraTrackModule---------------- #
 
 
 class SpatialTransformer(nn.Module):
@@ -352,6 +356,9 @@ class GeGLU(nn.Module):
         return x * F.gelu(gate)
 
 
+# -----------------UNet------------------ #
+
+
 class UNetModel(nn.Module):
     """
     ## U-Net model
@@ -475,6 +482,12 @@ class UNetModel(nn.Module):
                         SpatialTransformer(channels, n_heads, tf_layers, d_cond)
                     )
 
+                # Up-sample at every level after last residual block
+                # except the last one.
+                # Note that we are iterating in reverse; i.e. `i == 0` is the last.
+                if i != 0 and j == n_res_blocks:
+                    layers.append(UpSample(channels))
+
                 if i in intertrack_attention_levels:
                     layers.append(
                         InterTrackAttention(
@@ -484,11 +497,6 @@ class UNetModel(nn.Module):
                             num_intertrack_encoder_layers=num_intertrack_encoder_layers,
                         )
                     )
-                # Up-sample at every level after last residual block
-                # except the last one.
-                # Note that we are iterating in reverse; i.e. `i == 0` is the last.
-                if i != 0 and j == n_res_blocks:
-                    layers.append(UpSample(channels))
                 # Add to the output half of the U-Net
                 self.output_blocks.append(TimestepEmbedSequential(*layers))
 
@@ -511,7 +519,7 @@ class UNetModel(nn.Module):
             for k, v in polyffusion_checkpoints.items()
             if k.removeprefix("ldm.eps_model.") in self.state_dict()
         }
-        missing_keys, _ = self.load_state_dict(
+        missing_keys, unexpected_keys = self.load_state_dict(
             unet_from_polyffusion_state_dict, strict=False
         )
 
@@ -520,6 +528,7 @@ class UNetModel(nn.Module):
         print(
             "---------------polyffusion weights loaded with the above missing keys-------------------"
         )
+
         print("It is expected that missing keys are all intertrack attention modules")
 
     def time_step_embedding(self, time_steps: torch.Tensor, max_period: int = 10000):
@@ -563,11 +572,16 @@ class UNetModel(nn.Module):
         x = self.middle_block(x, t_emb, cond)
         # Output half of the U-Net
         for module in self.output_blocks:
-            x = th.cat([x, x_input_block.pop()], dim=1)
-            x = module(x, t_emb, cond)
 
+            x = th.cat([x, x_input_block.pop()], dim=2)
+
+            x = module(x, t_emb, cond)
+        b, t = x.shape[0], x.shape[1]
+        x = rearrange(x, "b t c w h -> (b t) c w h")
+        x = self.out(x)
+        x = rearrange(x, "(b t) c w h -> b t c w h", b=b, t=t)
         # Final normalization and $3 \times 3$ convolution
-        return self.out(x)
+        return x
 
 
 class TimestepEmbedSequential(nn.Sequential):
@@ -587,6 +601,7 @@ class TimestepEmbedSequential(nn.Sequential):
                 x = layer(x)
                 x = rearrange(x, "(b w h) t c -> b t c w h", b=b, w=w, h=h)
             else:
+
                 b, t = x.shape[0], x.shape[1]
                 x = rearrange(x, "b t c w h -> (b t) c w h")
                 if isinstance(layer, ResBlock):
@@ -694,6 +709,7 @@ class ResBlock(nn.Module):
         :param t_emb: is the time step embeddings of shape `[batch_size, d_t_emb]`
         """
         # Initial convolution
+
         h = self.in_layers(x)
         # Time step embeddings
         t_emb = self.emb_layers(t_emb).type(h.dtype)

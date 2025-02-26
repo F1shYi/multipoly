@@ -1,4 +1,4 @@
 # TODO
 
-1. Ensure weights are the same (chord encoder and decoder)
-2. Ensure model outputs are the same
+1. 整理数据处理经历的流程。
+2. 用自己的数据跑一遍chord conditioned并听效果

@@ -166,7 +166,7 @@ class LatentDiffusion(nn.Module):
         return F.mse_loss(noise, eps_theta)
 
 
-class Polyffusion_SDF(nn.Module):
+class MultiPoly_SDF(nn.Module):
     def __init__(
         self,
         ldm: LatentDiffusion,
@@ -181,7 +181,7 @@ class Polyffusion_SDF(nn.Module):
             mix: use a special condition for unconditional learning with probability of 0.2
         use_enc: whether to use pretrained chord encoder to generate encoded condition
         """
-        super(Polyffusion_SDF, self).__init__()
+        super(MultiPoly_SDF, self).__init__()
         self.ldm = ldm
         self.cond_type = cond_type
         self.cond_mode = cond_mode
@@ -195,27 +195,6 @@ class Polyffusion_SDF(nn.Module):
         if self.chord_dec is not None:
             for param in self.chord_dec.parameters():
                 param.requires_grad = False
-
-    @classmethod
-    def load_trained(
-        cls,
-        ldm,
-        chkpt_fpath,
-        cond_type,
-        cond_mode="cond",
-        chord_enc=None,
-        chord_dec=None,
-    ):
-        model = cls(
-            ldm,
-            cond_type,
-            cond_mode,
-            chord_enc,
-            chord_dec,
-        )
-        trained_leaner = torch.load(chkpt_fpath)
-        model.load_state_dict(trained_leaner["model"])
-        return model
 
     def p_sample(self, xt: torch.Tensor, t: torch.Tensor):
         return self.ldm.p_sample(xt, t)
