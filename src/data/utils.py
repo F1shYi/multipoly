@@ -21,3 +21,6 @@ def music_from_midi_fpath(midi_fpath):
     music = muspy.read(midi_fpath)
     music.adjust_resolution(4)
     return music
+
+def pr2c_from_music(music:muspy.Music):
+    pass
