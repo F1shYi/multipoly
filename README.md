@@ -1,4 +1,13 @@
-# TODO
+0 = Bass
+1 = Guitar
+2 = Piano
+3 = String
 
-1. 整理数据处理经历的流程。
-2. 用自己的数据跑一遍chord conditioned并听效果
+[(multitrack_pr2c),(Chord)]
+
+## TODOs
+
+1. check dataloader
+2. implement diffusion
+3. implement trainer
+4. train!!!!!

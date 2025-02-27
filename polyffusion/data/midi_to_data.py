@@ -41,8 +41,7 @@ def get_note_matrix(music: muspy.Music):
                         inst.program,
                     ]
                 )
-    # sort according to (start, duration)
-    # notes.sort(key=lambda x: (x[0] * BIN + x[1], x[2]))
+    
     notes.sort(key=lambda x: (x[0], x[1], x[2]))
     return notes
 
@@ -161,14 +160,9 @@ def get_downbeat_pos_and_filter(music: muspy.Music, debug_info):
     barlines = music.barlines
     for b in barlines:
         if not float(b.time).is_integer():
-            # print("======")
-            # print("downbeat not integer!")
-            # print(debug_info)
-            # BAD_SONGS.add(debug_info)
             return None, None
 
     db_pos = [int(b.time) for b in barlines]
-    # end_pos = int(music.get_end_time() / ONE_BEAT)
     db_pos_diff = np.diff(db_pos).tolist()
     db_pos_diff.append(db_pos_diff[len(db_pos_diff) - 1])
     assert len(db_pos_diff) == len(db_pos)
@@ -199,12 +193,8 @@ def get_start_table(notes, db_pos):
     """
     i-th row indicates the starting row of the "notes" array at i-th beat.
     """
-
-    # simply add 8-beat padding in case of out-of-range index
-    # total_beat = int(music.get_end_time()) + 8
     row_cnt = 0
     start_table = {}
-    # for beat in range(total_beat):
     for db in db_pos:
         while row_cnt < len(notes) and notes[row_cnt][0] < db:
             row_cnt += 1
