@@ -39,6 +39,7 @@ class InterTrackAttention(nn.Module):
         Input: a tensor of shape (N, L, C)
         Output: a tensor of shape (N, L, C)
         """
+
         output_tensor = input_tensor + self.attention(input_tensor)
         return output_tensor
 
@@ -597,9 +598,11 @@ class TimestepEmbedSequential(nn.Sequential):
 
             if isinstance(layer, InterTrackAttention):
                 b, t, c, w, h = x.shape
+
                 x = rearrange(x, "b t c w h -> (b w h) t c")
                 x = layer(x)
                 x = rearrange(x, "(b w h) t c -> b t c w h", b=b, w=w, h=h)
+
             else:
 
                 b, t = x.shape[0], x.shape[1]
