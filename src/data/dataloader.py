@@ -26,7 +26,7 @@ def collate_fn(batch, shift):
             shift_pitch = sample_shift()
             seg_prmat2c = pr_mat_pitch_shift(seg_prmat2c, shift_pitch)
             chord = onehot_to_chd(seg_chord)
-            seg_chord_shifted = chd_pitch_shift(chord, shift_pitch)
+            seg_chord_shifted = np.array(chd_pitch_shift(chord, shift_pitch),dtype=np.int32)
             
         seg_chord = chd_to_onehot(seg_chord_shifted)
 
@@ -40,10 +40,10 @@ def collate_fn(batch, shift):
 
 
 def get_train_val_dataloaders(
-    data_folder:str, batch_size:int, num_workers=0,train_ratio=0.8, pin_memory=False, 
+    data_folder:str, batch_size:int, num_workers=0,train_ratio=0.9, pin_memory=False, 
 ):
     
-    all_fpaths = [fpath for fpath in os.listdir(data_folder) if fpath.endswith(".npz")]
+    all_fpaths = [os.path.join(data_folder,fpath) for fpath in os.listdir(data_folder) if fpath.endswith(".npz")]
     all_fpaths = np.array(all_fpaths)
     np.random.shuffle(all_fpaths)
     train_num = int(len(all_fpaths)*train_ratio)
@@ -80,5 +80,19 @@ def get_train_val_dataloaders(
     return train_dl, val_dl
 
 
-if __name__ == "__main__":
-    pass
+# if __name__ == "__main__":
+#     train_dl, val_dl = get_train_val_dataloaders("/root/autodl-tmp/multipoly/data/lmd/lpd_5_midi/",5,2)
+#     for batch in train_dl:
+#         multi_prmat2cs, chords = batch
+#         print(multi_prmat2cs.shape)
+#         print(chords.shape)
+#         prmat = multi_prmat2cs[0]
+#         chord = chords[0]
+
+#         print(prmat.shape,chord.shape)
+#         chd_to_midi_file(chord, "test_chord.mid")
+#         for i in range(4):
+#             prmat2c_to_midi_file(prmat[i],f"test_{i}.mid")
+
+#         break
+    

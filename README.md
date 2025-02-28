@@ -7,7 +7,6 @@
 
 ## TODOs
 
-1. check dataloader
 2. implement diffusion
 3. implement trainer
 4. train!!!!!

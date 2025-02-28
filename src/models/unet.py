@@ -508,7 +508,10 @@ class UNetModel(nn.Module):
             nn.Conv2d(channels, out_channels, 3, padding=1),
         )
 
-    def load_polyffusion_checkpoints(self, polyffusion_checkpoints: dict):
+        self.polyffusion_weights_keys = None
+        self.other_weights_keys = None
+
+    def load_polyffusion_checkpoints(self, polyffusion_checkpoints: dict, freeze_polyffusion = True):
         print("---------------loading polyffusion weights-------------------")
 
         # first zero out all parameters
@@ -524,13 +527,30 @@ class UNetModel(nn.Module):
             unet_from_polyffusion_state_dict, strict=False
         )
 
+        self.other_weights_keys = missing_keys
+        self.polyffusion_weights_keys = [key for key in unet_from_polyffusion_state_dict.keys()]
+
         for key in missing_keys:
             print(key)
         print(
             "---------------polyffusion weights loaded with the above missing keys-------------------"
         )
-
+        if freeze_polyffusion:
+            self._freeze_polyffusion()
+            print("Polyffusion weights are freezed.")
         print("It is expected that missing keys are all intertrack attention modules")
+
+    def _freeze_polyffusion(self):
+        for name, param in self.named_parameters():
+            if name in self.polyffusion_weights_keys:
+                param.requires_grad = False
+    
+    def _unfreeze_polyffusion(self):
+        for name, param in self.named_parameters():
+            if name in self.polyffusion_weights_keys:
+                param.requires_grad = True
+    
+
 
     def time_step_embedding(self, time_steps: torch.Tensor, max_period: int = 10000):
         """
