@@ -6,7 +6,5 @@
 [(multitrack_pr2c),(Chord)]
 
 ## TODOs
-
-2. implement diffusion
-3. implement trainer
-4. train!!!!!
+1. generate cleaner npzs
+2. test unfreeze polyffusion
