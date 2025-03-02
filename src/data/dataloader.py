@@ -2,8 +2,8 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 import os
-from dataset import LMDDataset,DataSampleNpz
-from utils import (
+from .dataset import LMDDataset,DataSampleNpz
+from .utils import (
     chd_pitch_shift,
     chd_to_midi_file,
     chd_to_onehot,
@@ -21,14 +21,14 @@ def collate_fn(batch, shift):
     for b in batch:
         seg_prmat2c = b[0]
         seg_chord = b[1]
+        seg_chord = np.array(onehot_to_chd(seg_chord), dtype=np.int32)
 
         if shift:
             shift_pitch = sample_shift()
             seg_prmat2c = pr_mat_pitch_shift(seg_prmat2c, shift_pitch)
-            chord = onehot_to_chd(seg_chord)
-            seg_chord_shifted = np.array(chd_pitch_shift(chord, shift_pitch),dtype=np.int32)
-            
-        seg_chord = chd_to_onehot(seg_chord_shifted)
+            seg_chord = np.array(chd_pitch_shift(seg_chord, shift_pitch),dtype=np.int32)
+    
+        seg_chord = chd_to_onehot(seg_chord)
 
         prmat2cs.append(seg_prmat2c)
         chords.append(seg_chord)
@@ -80,19 +80,3 @@ def get_train_val_dataloaders(
     return train_dl, val_dl
 
 
-# if __name__ == "__main__":
-#     train_dl, val_dl = get_train_val_dataloaders("/root/autodl-tmp/multipoly/data/lmd/lpd_5_midi/",5,2)
-#     for batch in train_dl:
-#         multi_prmat2cs, chords = batch
-#         print(multi_prmat2cs.shape)
-#         print(chords.shape)
-#         prmat = multi_prmat2cs[0]
-#         chord = chords[0]
-
-#         print(prmat.shape,chord.shape)
-#         chd_to_midi_file(chord, "test_chord.mid")
-#         for i in range(4):
-#             prmat2c_to_midi_file(prmat[i],f"test_{i}.mid")
-
-#         break
-    

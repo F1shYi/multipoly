@@ -549,6 +549,16 @@ class UNetModel(nn.Module):
         for name, param in self.named_parameters():
             if name in self.polyffusion_weights_keys:
                 param.requires_grad = True
+
+    def get_norm_of_trainable_params(self):
+        all_params = []
+        for param in self.parameters():
+            if param.requires_grad:
+                all_params.append(param.data.flatten())
+               
+        
+        norm = torch.norm(torch.cat(all_params))
+        return norm
     
 
 
@@ -575,8 +585,8 @@ class UNetModel(nn.Module):
     def forward(self, x: torch.Tensor, time_steps: torch.Tensor, cond: torch.Tensor):
         """
         :param x: is the input feature map of shape `[batch_size, track_num, channels, width, height]`
-        :param time_steps: are the time steps of shape `[batch_size]`
-        :param cond: conditioning of shape `[batch_size, n_cond, d_cond]`
+        :param time_steps: are the time steps of shape `[batch_size*track_num]`
+        :param cond: conditioning of shape `[batch_size*track_num, n_cond, d_cond]`
         """
         # To store the input half outputs for skip connections
         x_input_block = []

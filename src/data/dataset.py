@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from torch.utils.data import Dataset
-from utils import nmat_to_multi_prmat2c
+from .utils import nmat_to_multi_prmat2c
 
 SEG_LGTH = 32
 N_BIN = 4
