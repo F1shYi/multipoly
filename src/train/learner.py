@@ -6,38 +6,48 @@ import torch.optim as optim
 import os
 import numpy as np
 from torch.utils.tensorboard.writer import SummaryWriter
-
-POLYFFUSION_CKPT_PATH = "/root/autodl-tmp/multipoly/polyffusion_ckpts/ldm_chd8bar/sdf+pop909wm_mix16_chd8bar/01-11_102022/chkpts/weights_best.pt"
-CHORD_ENCODER_CKPT_PATH = "/root/autodl-tmp/multipoly/pretrained/chd8bar/weights.pt"
-TRAINABLE_DICT = {"n_intertrack_head":4, "num_intertrack_encoder_layers":1,"intertrack_attention_levels":[2,3]}
-DATAFOLDER = "/root/autodl-tmp/multipoly/data/lmd/lpd_5_midi/"   
-BATCH_SIZE = 7
-NUM_WORKERS = 4                         
-LR = 1e-7
+import yaml
 
 class Learner:
-    def __init__(self, output_dir):
+    def __init__(self, config):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.diffusion = get_diffusion(POLYFFUSION_CKPT_PATH, CHORD_ENCODER_CKPT_PATH, TRAINABLE_DICT, freeze_polyffusion=False).to(self.device)
-        self.train_loader, self.val_loader = get_train_val_dataloaders(DATAFOLDER, BATCH_SIZE, NUM_WORKERS, train_ratio=0.95, pin_memory=True)
+        self.diffusion = get_diffusion(
+            config["paths"]["polyffusion"],
+            config["paths"]["chord_encoder"],
+            config["models"]["transformers"],
+            config["training"]["freeze_polyffusion"],
+            ).to(self.device)
         
-        self.optimizer = optim.Adam(self.diffusion.parameters(), lr=LR)
+        self.train_loader, self.val_loader = get_train_val_dataloaders(
+            config["paths"]["dataset"],
+            config["data"]["batch_size"],
+            config["data"]["num_workers"],
+            config["data"]["train_ratio"],
+            pin_memory=True)
+        
+        self.optimizer = optim.Adam(self.diffusion.parameters(), lr=config["training"]["lr"])
 
-        self.output_dir = output_dir
+
+
+        self.output_dir = config["paths"]["output"]
         self.log_dir = self.output_dir + "/logs"
         self.ckpt_dir = self.output_dir + "/ckpts"
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.ckpt_dir, exist_ok=True)
+
+        with open(self.output_dir+"/config.yaml", "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
 
         self.autocast = torch.cuda.amp.autocast(enabled=True)
 
         self.writer = SummaryWriter(self.log_dir)
         self.epoch = 0
         self.step = 0
-
-        self.log_train_loss_interval = 1000
-        self.validation_interval = 20000
+        self.accumulation_steps = config["training"]["accumulation_steps"]
+        self.log_train_loss_interval = 100
+        self.validation_interval = 5000
         self.best_val_loss = 1e10
         
         
@@ -46,22 +56,22 @@ class Learner:
             running_loss = []
             from tqdm import tqdm
             for batch in tqdm(self.train_loader):
-                
-                self.diffusion.train()
                 multi_prmat,chord = batch
                 multi_prmat = multi_prmat.to(self.device)
                 chord = chord.to(self.device)
                 with self.autocast:
                     loss = self.diffusion.loss(multi_prmat, chord)
-
+                    loss = loss/self.accumulation_steps
                 running_loss.append(loss.item())
-
                 loss.backward()
-                self.optimizer.step()
 
+                if (self.step + 1) % self.accumulation_steps == 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+
+                
                 if self.step % self.log_train_loss_interval == 0:
-                    self.writer.add_scalar('Training Loss', np.mean(running_loss), self.step)                 
-
+                    self.writer.add_scalar('Training Loss', np.mean(running_loss), self.step)
                     running_loss = []
                     self.writer.flush()
                 
@@ -82,9 +92,14 @@ class Learner:
                     self.save_checkpoint(False)
                     if val_loss < self.best_val_loss:
                         self.best_val_loss = val_loss
-                        self.save_checkpoint(True)                
-
+                        self.save_checkpoint(True)       
+                    self.diffusion.train()       
                 self.step += 1
+
+            if (self.step + 1) % self.accumulation_steps == 0:
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
             self.epoch += 1
     
     def save_checkpoint(self,is_best = False):

@@ -13,6 +13,7 @@ from .utils import (
 )
 
 def collate_fn(batch, shift):
+
     def sample_shift():
         return np.random.choice(np.arange(-6, 6), 1)[0]
 
@@ -33,10 +34,10 @@ def collate_fn(batch, shift):
         prmat2cs.append(seg_prmat2c)
         chords.append(seg_chord)
         
-    prmat2cs = torch.Tensor(np.array(prmat2cs, np.float32)).float()
-    chords = torch.Tensor(np.array(chords, np.float32)).float()
+    ret_prmat2cs = torch.Tensor(np.array(prmat2cs, np.float32)).float()
+    ret_chords = torch.Tensor(np.array(chords, np.float32)).float()
     
-    return prmat2cs, chords
+    return ret_prmat2cs, ret_chords
 
 
 def get_train_val_dataloaders(

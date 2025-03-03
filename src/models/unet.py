@@ -29,6 +29,7 @@ class InterTrackAttention(nn.Module):
             nhead=n_intertrack_head,
             dim_feedforward=d_intertrack_ff,
             batch_first=True,
+            norm_first=True,
         )
         self.attention = nn.TransformerEncoder(
             encoder, num_layers=num_intertrack_encoder_layers
@@ -550,15 +551,15 @@ class UNetModel(nn.Module):
             if name in self.polyffusion_weights_keys:
                 param.requires_grad = True
 
-    def get_norm_of_trainable_params(self):
-        all_params = []
-        for param in self.parameters():
-            if param.requires_grad:
-                all_params.append(param.data.flatten())
+    # def get_norm_of_trainable_params(self):
+    #     all_params = []
+    #     for param in self.parameters():
+    #         if param.requires_grad:
+    #             all_params.append(param.data.flatten())
                
         
-        norm = torch.norm(torch.cat(all_params))
-        return norm
+    #     norm = torch.norm(torch.cat(all_params))
+    #     return norm
     
 
 

@@ -8,3 +8,7 @@
 ## TODOs
 1. generate cleaner npzs
 2. test unfreeze polyffusion
+
+## Training Configs
+
+

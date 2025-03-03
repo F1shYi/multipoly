@@ -20,3 +20,4 @@ class ChordEncoder(nn.Module):
         var = self.linear_var(x).exp_()
         dist = Normal(mu, var)
         return dist
+
