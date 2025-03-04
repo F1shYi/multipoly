@@ -20,3 +20,11 @@ def get_diffusion(polyffusion_ckpts_fpath, chord_encoder_ckpt_fpath, unet_traina
     diffusion = Diffusion(unet_model=unet,chord_encoder=chord_encoder, **DIFFUSION_PARAMS_FIXED)
 
     return diffusion
+
+def get_diffusion_from_ckpts(unet_trainable_params, diffusion_ckpts_fpath):
+    unet = UNetModel(**POLYFFUSION_PARAMS_FIXED, **unet_trainable_params)
+    chord_encoder = ChordEncoder(**CHORD_ENCODER_PARAMS_FIXED)
+    diffusion = Diffusion(unet_model=unet,chord_encoder=chord_encoder, **DIFFUSION_PARAMS_FIXED)
+    diffusion_checkpoint = torch.load(diffusion_ckpts_fpath)["model_state_dict"]
+    diffusion.load_state_dict(diffusion_checkpoint)
+    return diffusion

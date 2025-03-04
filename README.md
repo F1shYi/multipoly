@@ -3,12 +3,14 @@
 2 = Piano
 3 = String
 
-[(multitrack_pr2c),(Chord)]
+# Return value of `__getitem__`
 
-## TODOs
-1. generate cleaner npzs
-2. test unfreeze polyffusion
+a tuple of multitrack_pianoroll_2channel, chord.
 
-## Training Configs
+# Training Configs
 
+|      | Polyffusion | Random |
+|------|-------------|--------|
+| 5e-5 | exp1        | exp2   |
+| 1e-7 | exp3        | exp4   |
 
