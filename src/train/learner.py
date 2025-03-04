@@ -15,7 +15,7 @@ class Learner:
             config["paths"]["polyffusion"],
             config["paths"]["chord_encoder"],
             config["models"]["transformers"],
-            (config["init"]["intertrack"] == "polyffusion"),
+            (config["init"]["intratrack"] == "polyffusion"),
             config["training"]["freeze_polyffusion"],
             (config["init"]["intertrack"] == "zero"),
             ).to(self.device)
