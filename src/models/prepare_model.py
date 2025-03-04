@@ -4,11 +4,12 @@ from models.diffusion import Diffusion
 from models.fixed_params import DIFFUSION_PARAMS_FIXED, POLYFFUSION_PARAMS_FIXED, CHORD_ENCODER_PARAMS_FIXED
 import torch
 
-def get_diffusion(polyffusion_ckpts_fpath, chord_encoder_ckpt_fpath, unet_trainable_params, freeze_polyffusion = True):
+def get_diffusion(polyffusion_ckpts_fpath, chord_encoder_ckpt_fpath, unet_trainable_params,use_polyffuion = True, freeze_polyffusion = True, zero = True):
 
     unet = UNetModel(**POLYFFUSION_PARAMS_FIXED, **unet_trainable_params)
-    polyffusion_checkpoint = torch.load(polyffusion_ckpts_fpath)["model"]
-    unet.load_polyffusion_checkpoints(polyffusion_checkpoint, freeze_polyffusion)
+    if use_polyffuion:
+        polyffusion_checkpoint = torch.load(polyffusion_ckpts_fpath)["model"]
+        unet.load_polyffusion_checkpoints(polyffusion_checkpoint, freeze_polyffusion, zero)
 
     chord_checkpoint = torch.load(chord_encoder_ckpt_fpath)["model"]
     chord_encoder = ChordEncoder(**CHORD_ENCODER_PARAMS_FIXED)

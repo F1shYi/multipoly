@@ -15,7 +15,9 @@ class Learner:
             config["paths"]["polyffusion"],
             config["paths"]["chord_encoder"],
             config["models"]["transformers"],
+            (config["init"]["intertrack"] == "polyffusion"),
             config["training"]["freeze_polyffusion"],
+            (config["init"]["intertrack"] == "zero"),
             ).to(self.device)
         
         self.train_loader, self.val_loader = get_train_val_dataloaders(
@@ -46,7 +48,7 @@ class Learner:
         self.epoch = 0
         self.step = 0
         self.accumulation_steps = config["training"]["accumulation_steps"]
-        self.log_train_loss_interval = 100
+        self.log_train_loss_interval = 200
         self.validation_interval = 5000
         self.best_val_loss = 1e10
         
@@ -61,8 +63,8 @@ class Learner:
                 chord = chord.to(self.device)
                 with self.autocast:
                     loss = self.diffusion.loss(multi_prmat, chord)
-                    loss = loss/self.accumulation_steps
                 running_loss.append(loss.item())
+                loss = loss/self.accumulation_steps
                 loss.backward()
 
                 if (self.step + 1) % self.accumulation_steps == 0:
@@ -70,12 +72,12 @@ class Learner:
                     self.optimizer.zero_grad()
 
                 
-                if self.step % self.log_train_loss_interval == 0:
+                if (self.step + 1) % self.log_train_loss_interval == 0:
                     self.writer.add_scalar('Training Loss', np.mean(running_loss), self.step)
                     running_loss = []
                     self.writer.flush()
                 
-                if self.step % self.validation_interval == 0 and self.step != 0:
+                if (self.step + 1) % self.validation_interval == 0:
                     self.diffusion.eval()
                     val_loss = []
                     with torch.no_grad():
@@ -96,7 +98,7 @@ class Learner:
                     self.diffusion.train()       
                 self.step += 1
 
-            if (self.step + 1) % self.accumulation_steps == 0:
+            if (self.step + 1) % self.accumulation_steps != 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 

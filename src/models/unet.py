@@ -512,12 +512,13 @@ class UNetModel(nn.Module):
         self.polyffusion_weights_keys = None
         self.other_weights_keys = None
 
-    def load_polyffusion_checkpoints(self, polyffusion_checkpoints: dict, freeze_polyffusion = True):
+    def load_polyffusion_checkpoints(self, polyffusion_checkpoints: dict, freeze_polyffusion = True, zero = True):
         print("---------------loading polyffusion weights-------------------")
 
-        # first zero out all parameters
-        for params in self.parameters():
-            params.data.fill_(0.0)
+        if zero:
+            # first zero out all parameters
+            for params in self.parameters():
+                params.data.fill_(0.0)
         # then load polyffusion checkpoints
         unet_from_polyffusion_state_dict = {
             k.removeprefix("ldm.eps_model."): v

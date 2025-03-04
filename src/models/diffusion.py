@@ -174,7 +174,6 @@ class Diffusion(nn.Module):
         x0: torch.Tensor,
         chord: torch.Tensor,
         noise: Optional[torch.Tensor] = None,
-        uncond_prob: float = 0.2
     ):
         batch_size, track_num = x0.shape[0], x0.shape[1]
 
@@ -188,9 +187,7 @@ class Diffusion(nn.Module):
 
         t = torch.cat([t.reshape(-1,1)]*track_num, dim=1).reshape(-1,)
         cond = torch.cat([cond]*track_num, dim=1).reshape(-1,1,512)
-        if random.random() < uncond_prob:
-            cond = -torch.ones_like(cond).to(cond.device)
-
+        
 
         eps_theta = self.eps_model(xt, t, cond)
 
