@@ -1,7 +1,7 @@
 paths:
   polyffusion: "/root/autodl-tmp/multipoly/polyffusion_ckpts/ldm_chd8bar/sdf+pop909wm_mix16_chd8bar/01-11_102022/chkpts/weights_best.pt"
   chord_encoder: "/root/autodl-tmp/multipoly/pretrained/chd8bar/weights.pt"
-  dataset: "/root/autodl-tmp/multipoly/data/lmd/lpd_filtered"
+  dataset: "/root/autodl-tmp/multipoly/data/lmd/lpd_filtered_2"
   output: "./exp/exp_v1"
 
 data:
@@ -10,7 +10,7 @@ data:
   train_ratio: 0.9
 
 init:
-  intertrack: "zero"
+  intertrack: "random"
   intratrack: "polyffusion"
 
 models:
@@ -25,7 +25,7 @@ models:
 training:
   freeze_polyffusion: false
   optim: "adam"
-  lr: 1.0e-08
+  lr: 5.0e-05
   accumulation_steps: 20
   
 

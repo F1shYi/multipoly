@@ -11,7 +11,7 @@ data:
 
 init:
   intertrack: "random"
-  intratrack: "polyffusion"
+  intratrack: "random"
 
 models:
   transformers:
