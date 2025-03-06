@@ -30,7 +30,8 @@ class EightBarSamplerFromChord:
             chord = batch[1]
             self.chord = chord[0].reshape(1,32,36).to(self.device)
             break
-        
+        self.uncond = -torch.ones(1,1,512).to(self.device)
+       
         self.output_folder = config["paths"]["output"]
         os.makedirs(self.output_folder, exist_ok=True)
         self.num_gen = config["num_gen"]
@@ -48,7 +49,8 @@ class EightBarSamplerFromChord:
             gen = self.diffusion.sample(
                 shape=[1,4,2,128,128],
                 chords=self.chord,
-                uncond_scale=1.0)
+                uncond_scale=5.0,
+                uncond_cond=self.uncond)
             
             gen = gen.cpu().numpy()[0]
             for track_idx in range(4):

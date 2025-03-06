@@ -1,7 +1,7 @@
 paths:
-  diffusion: "/root/autodl-fs/exp/exp_v3/ckpts/last.pth"
+  diffusion: "/root/autodl-fs/exp/exp_v3/ckpts/best.pth"
   chord: "/root/autodl-tmp/multipoly/src/tests/exp/chord.mid"
-  output: "/root/autodl-fs/exp/exp_v3/"
+  output: "/root/autodl-fs/exp/exp_v3_best/"
   dataset: "/root/autodl-tmp/multipoly/data/lmd/lpd_4_clean/"
 
 models:

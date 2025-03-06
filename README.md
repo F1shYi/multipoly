@@ -17,4 +17,12 @@ a tuple of multitrack_pianoroll_2channel, chord.
 
 
 # TODO
-train_valid_split每一次都是随机的，需要修改，否则在sample的时候可能会见到已有的数据集。
+
+采样一些8-bar segment听一下
+
+
+流程：
+
+0. 改网络结构，用3dconv zero init；改学习率，分不同的学习率；改lr，用warm up+decay
+1. 加载数据，从val dl中随机选一首曲子
+2. 每隔一定的step就验证，在验证的过程中，生成并保存结果 
