@@ -1,2 +1,0 @@
-from models.prepare_model import get_diffusion_from_ckpts
-

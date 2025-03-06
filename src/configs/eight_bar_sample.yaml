@@ -1,0 +1,25 @@
+paths:
+  diffusion: "/root/autodl-fs/exp/exp_v3/ckpts/last.pth"
+  chord: "/root/autodl-tmp/multipoly/src/tests/exp/chord.mid"
+  output: "/root/autodl-fs/exp/exp_v3/"
+  dataset: "/root/autodl-tmp/multipoly/data/lmd/lpd_4_clean/"
+
+models:
+  transformers:
+    n_intertrack_head: 4
+    num_intertrack_encoder_layers: 1
+    intertrack_attention_levels:
+    - 2
+    - 3
+
+num_gen: 2
+
+data:
+  batch_size: 7
+  num_workers: 0
+  train_ratio: 0.9
+
+
+  
+
+  

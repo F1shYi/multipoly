@@ -10,26 +10,6 @@ import yaml
 
 class Learner:
     def __init__(self, config):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.diffusion = get_diffusion(
-            config["paths"]["polyffusion"],
-            config["paths"]["chord_encoder"],
-            config["models"]["transformers"],
-            (config["init"]["intratrack"] == "polyffusion"),
-            config["training"]["freeze_polyffusion"],
-            (config["init"]["intertrack"] == "zero"),
-            ).to(self.device)
-        
-        self.train_loader, self.val_loader = get_train_val_dataloaders(
-            config["paths"]["dataset"],
-            config["data"]["batch_size"],
-            config["data"]["num_workers"],
-            config["data"]["train_ratio"],
-            pin_memory=True)
-        
-        self.optimizer = optim.Adam(self.diffusion.parameters(), lr=config["training"]["lr"])
-
-
 
         self.output_dir = config["paths"]["output"]
         self.log_dir = self.output_dir + "/logs"
@@ -41,9 +21,30 @@ class Learner:
         with open(self.output_dir+"/config.yaml", "w") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.diffusion = get_diffusion(
+            config["paths"]["polyffusion"],
+            config["paths"]["chord_encoder"],
+            config["models"]["transformers"],
+            (config["init"]["intratrack"] == "polyffusion"),
+            config["training"]["freeze_polyffusion"],
+            (config["init"]["intertrack"] == "zero"),
+            ).to(self.device)
+        
+        self.train_loader, self.val_loader, self.train_fpaths, self.val_fpaths = get_train_val_dataloaders(
+            config["paths"]["dataset"],
+            config["data"]["batch_size"],
+            config["data"]["num_workers"],
+            config["data"]["train_ratio"],
+            pin_memory=True,
+            return_split=True)
+        
+        np.save(self.output_dir+"/train_fpaths", self.train_fpaths)
+        np.save(self.output_dir+"/val_fpaths", self.val_fpaths)
+        
+        self.optimizer = optim.Adam(self.diffusion.parameters(), lr=config["training"]["lr"])
 
-        self.autocast = torch.cuda.amp.autocast(enabled=True)
-
+       
         self.writer = SummaryWriter(self.log_dir)
         self.epoch = 0
         self.step = 0
@@ -61,8 +62,7 @@ class Learner:
                 multi_prmat,chord = batch
                 multi_prmat = multi_prmat.to(self.device)
                 chord = chord.to(self.device)
-                with self.autocast:
-                    loss = self.diffusion.loss(multi_prmat, chord)
+                loss = self.diffusion.loss(multi_prmat, chord)
                 running_loss.append(loss.item())
                 loss = loss/self.accumulation_steps
                 loss.backward()

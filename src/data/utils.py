@@ -4,6 +4,7 @@ from chord_extractor import extract_chords_from_midi_file
 import csv
 import mir_eval
 import pretty_midi as pm
+import os
 
 def get_chord_matrix(fpath):
     """
@@ -247,7 +248,7 @@ def prmat2c_to_midi_file(
     midi = pm.PrettyMIDI()
     piano_program = pm.instrument_name_to_program("Acoustic Grand Piano")
     origin = pm.Instrument(program=piano_program)
-    n_step = prmat2c.shape[2]
+    n_step = prmat2c.shape[1]
     onset = prmat2c[0]
     sustain = prmat2c[1]
     for step_ind, step in enumerate(onset):
@@ -271,3 +272,9 @@ def prmat2c_to_midi_file(
     midi.write(fpath)
 
 
+def midi_to_one_hot_chd(midi_fpath,chd_fpath):
+    extract_chords_from_midi_file(midi_fpath, chd_fpath)
+    chord = np.array(get_chord_matrix(chd_fpath))
+    np_chords = chd_to_onehot(chord)
+    os.remove(chd_fpath)
+    return np_chords
