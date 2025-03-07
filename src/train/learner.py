@@ -1,5 +1,6 @@
 from models.prepare_model import get_diffusion
 from data.dataloader import get_train_val_dataloaders
+from data.utils import prmat2c_to_midi_file, chd_to_midi_file
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -31,7 +32,7 @@ class Learner:
             (config["init"]["intertrack"] == "zero"),
             ).to(self.device)
         
-        self.train_loader, self.val_loader, self.train_fpaths, self.val_fpaths = get_train_val_dataloaders(
+        (self.train_ds, self.train_loader), (self.val_ds,self.val_loader), self.train_fpaths, self.val_fpaths = get_train_val_dataloaders(
             config["paths"]["dataset"],
             config["data"]["batch_size"],
             config["data"]["num_workers"],
@@ -42,9 +43,33 @@ class Learner:
         np.save(self.output_dir+"/train_fpaths", self.train_fpaths)
         np.save(self.output_dir+"/val_fpaths", self.val_fpaths)
         
+        # Generate samples at each validation step
+        self.val_segs_idx = []
+        for _ in range(config["validation"]["num_seg"]):
+            while True:
+                idx = np.random.randint(0,len(self.val_ds))
+                if idx not in self.val_segs_idx:
+                    self.val_segs_idx.append(idx)
+                    break
+        assert len(self.val_segs_idx) == config["validation"]["num_seg"]
+        self.val_segs = [self.val_ds[idx] for idx in self.val_segs_idx]
+        self.val_num_gen = config["validation"]["num_gen_per_seg"]
+        # save chosen validation segments and chords
+        NAME = ["bass", "guitar", "piano", "string"]
+        for seg_idx, seg in enumerate(self.val_segs):
+            prmat, chord = seg
+            chord_fpath = os.path.join(self.output_dir, f"val_{seg_idx}_chord.mid")
+            chd_to_midi_file(chord, chord_fpath)
+            for track_idx, track in enumerate(prmat):
+                midi_fpath = os.path.join(self.output_dir, f"val_{seg_idx}_track_{NAME[track_idx]}.mid")
+                prmat2c_to_midi_file(track, midi_fpath)
+
+
+
         self.optimizer = optim.Adam(self.diffusion.parameters(), lr=config["training"]["lr"])
 
-       
+
+
         self.writer = SummaryWriter(self.log_dir)
         self.epoch = 0
         self.step = 0
@@ -53,7 +78,10 @@ class Learner:
         self.validation_interval = 5000
         self.best_val_loss = 1e10
         
-        
+    
+
+
+
     def train(self):
         while True:
             running_loss = []
@@ -104,6 +132,33 @@ class Learner:
 
             self.epoch += 1
     
+    def validation_step(self):
+        from tqdm import tqdm
+        self.diffusion.eval()
+        val_loss = []
+        with torch.no_grad():
+            for batch in tqdm(self.val_loader):
+                multi_prmat,chord = batch
+                multi_prmat = multi_prmat.to(self.device)
+                chord = chord.to(self.device)
+                loss = self.diffusion.loss(multi_prmat, chord)
+                val_loss.append(loss.item())
+        val_loss = np.mean(val_loss)
+        self.writer.add_scalar('Validation Loss', val_loss, self.step)
+        self.writer.flush()
+        self.save_checkpoint(False)
+        if val_loss < self.best_val_loss:
+            self.best_val_loss = val_loss
+            self.save_checkpoint(True)   
+
+        for val_seg in self.val_segs:
+            # TODO generate samples
+            pass
+
+        self.diffusion.train()      
+
+
+
     def save_checkpoint(self,is_best = False):
         fpath = "best.pth" if is_best else "last.pth"
         checkpoint_path = os.path.join(self.ckpt_dir, fpath)

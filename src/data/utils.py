@@ -244,7 +244,6 @@ def prmat2c_to_midi_file(
     # prmat2c: (2, step, 128)
     if "Tensor" in str(type(prmat2c)):
         prmat2c = prmat2c.cpu().detach().numpy()
-    print(f"prmat2c : {prmat2c.shape}")
     midi = pm.PrettyMIDI()
     piano_program = pm.instrument_name_to_program("Acoustic Grand Piano")
     origin = pm.Instrument(program=piano_program)

@@ -18,7 +18,10 @@ a tuple of multitrack_pianoroll_2channel, chord.
 
 # TODO
 
-采样一些8-bar segment听一下
+采样一些8-bar segment听一下，发现大多数segment中只有1-2轨有旋律，这会使模型倾向于全部预测0
+
+数据处理：
+1. 重新处理LMD，切分为8-bar segment，但依照每个segment里四个乐器都要有的原则进行切分。
 
 
 流程：

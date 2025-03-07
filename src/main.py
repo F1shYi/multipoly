@@ -10,7 +10,7 @@ def load_config(config_path):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Parse command-line arguments.")
-    parser.add_argument("--config", type=str, required=False, help="Directory to save config files.", default="src/configs/params_v5.yaml")
+    parser.add_argument("--config", type=str, required=False, help="Directory to save config files.", default="src/configs/params_v1_v1.yaml")
     
     args = parser.parse_args()
     
@@ -20,10 +20,5 @@ if __name__ == "__main__":
     args = parse_args()
     config = load_config(args.config)
     learner = Learner(config)
-    learner.train()
+    #learner.train()
 
-
-    
-
-    # learner = Learner(args.output_dir)
-    # learner.train()

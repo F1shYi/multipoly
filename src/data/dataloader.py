@@ -79,8 +79,8 @@ def get_train_val_dataloaders(
         f"Dataloader ready: batch_size={batch_size}, num_workers={num_workers}, pin_memory={pin_memory}, train_segments={len(train_dataset)}, val_segments={len(val_dataset)}"
     )
     if return_split:
-        return train_dl, val_dl, train_fpaths, val_fpaths
+        return (train_dataset, train_dl), (val_dataset, val_dl), train_fpaths, val_fpaths
     else:
-        return train_dl, val_dl
+        return (train_dataset, train_dl),(val_dataset, val_dl)
 
 
