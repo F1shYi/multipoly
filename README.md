@@ -22,6 +22,10 @@ a tuple of multitrack_pianoroll_2channel, chord.
 
 数据处理：
 1. 重新处理LMD，切分为8-bar segment，但依照每个segment里四个乐器都要有的原则进行切分。
+2. 存储，存成[B, 5, 2, 128, 128]，[B, 32, 36]的矩阵
+3. data augmentation?
+
+
 
 
 流程：
@@ -29,3 +33,4 @@ a tuple of multitrack_pianoroll_2channel, chord.
 0. 改网络结构，用3dconv zero init；改学习率，分不同的学习率；改lr，用warm up+decay
 1. 加载数据，从val dl中随机选一首曲子
 2. 每隔一定的step就验证，在验证的过程中，生成并保存结果 
+

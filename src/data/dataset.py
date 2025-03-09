@@ -125,3 +125,6 @@ class LMDDataset(Dataset):
         song_data = self.data_samples[song_no]
         return song_data[song_item]
 
+class EightBarSegmentDataset(Dataset):
+    def __init__(self, data_folders):
+        pass

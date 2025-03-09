@@ -4,33 +4,25 @@ import numpy as np
 import os
 from .dataset import LMDDataset,DataSampleNpz
 from .utils import (
-    chd_pitch_shift,
+    onehot_chd_pitch_shift,
     chd_to_midi_file,
-    chd_to_onehot,
-    onehot_to_chd,
     pr_mat_pitch_shift,
     prmat2c_to_midi_file,
 )
 
 def collate_fn(batch, shift):
 
-    def sample_shift():
-        return np.random.choice(np.arange(-6, 6), 1)[0]
-
+    
     prmat2cs = []
     chords = []
     for b in batch:
         seg_prmat2c = b[0]
         seg_chord = b[1]
-        seg_chord = np.array(onehot_to_chd(seg_chord), dtype=np.int32)
-
         if shift:
-            shift_pitch = sample_shift()
+            shift_pitch = np.random.choice(np.arange(-6, 6), 1)[0]
             seg_prmat2c = pr_mat_pitch_shift(seg_prmat2c, shift_pitch)
-            seg_chord = np.array(chd_pitch_shift(seg_chord, shift_pitch),dtype=np.int32)
+            seg_chord = onehot_chd_pitch_shift(seg_chord, shift_pitch)
     
-        seg_chord = chd_to_onehot(seg_chord)
-
         prmat2cs.append(seg_prmat2c)
         chords.append(seg_chord)
         

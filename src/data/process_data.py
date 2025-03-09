@@ -6,6 +6,8 @@
 import muspy
 import numpy as np
 from typing import List
+from data.utils import midi_to_one_hot_chd
+
 
 def get_track_idx(is_drum = None, program_num = None, track_name = None):
     if is_drum == True:
@@ -113,10 +115,10 @@ def music_to_a_list_of_8bar_segments(music: muspy.Music, threshold: int) -> List
     return music_segments
     
 
-if __name__ == "__main__":
+def midi2seg():
     midi_folder = "/root/autodl-tmp/multipoly/data/lmd/lpd_5_midi/"
     write_folder1 = "/root/autodl-tmp/multipoly/data/segments"
-    write_folder2 = "/root/autodl-fs/segments"
+    # write_folder2 = "/root/autodl-fs/segments"
 
     
 
@@ -125,19 +127,98 @@ if __name__ == "__main__":
     import os
 
     os.makedirs(write_folder1, exist_ok=True)
-    os.makedirs(write_folder2, exist_ok=True)
+    # os.makedirs(write_folder2, exist_ok=True)
     all_midi_fpaths = [os.path.join(midi_folder, path) for path in os.listdir(midi_folder) if path.endswith(".mid")]
 
     for midi_fpath in tqdm(all_midi_fpaths):
         music = muspy.read(midi_fpath)
         music_segments = music_to_a_list_of_8bar_segments(music, threshold=8)
         for segment in (music_segments):
-            write_fpath1 = os.path.join(write_folder1, f"set_{seg_num}.mid")
-            write_fpath2 = os.path.join(write_folder2, f"set_{seg_num}.mid")
+            write_fpath1 = os.path.join(write_folder1, f"seg_{seg_num}.mid")
+            # write_fpath2 = os.path.join(write_folder2, f"set_{seg_num}.mid")
         
             segment.write_midi(write_fpath1)
-            segment.write_midi(write_fpath2)
+            # segment.write_midi(write_fpath2)
             seg_num += 1
     print(f"Finishes processing with {seg_num} segments.")
 
+
+def midi_to_npz():
+    midi_folder = "/root/autodl-tmp/multipoly/data/segments"
+    train_folder = "/root/autodl-tmp/multipoly/data/train"
+    val_folder = "/root/autodl-tmp/multipoly/data/val"
+    import os
+    import random
+    os.makedirs(train_folder, exist_ok=True)
+    os.makedirs(val_folder, exist_ok=True)
+
+    all_midi_fpaths = [os.path.join(midi_folder, path) for path in os.listdir(midi_folder) if path.endswith(".mid")]
+    random.shuffle(all_midi_fpaths)
     
+    train_length = int(len(all_midi_fpaths)*0.8)
+
+    train_midi_fpaths = all_midi_fpaths[:train_length]
+    val_midi_fpaths = all_midi_fpaths[train_length:]
+    from tqdm import tqdm
+    for train_idx, train_midi_fpath in tqdm(enumerate(train_midi_fpaths)):
+        music = muspy.read_midi(train_midi_fpath)
+        multi_prmat_2c = np.zeros((4,2,128,128))
+        for track in music.tracks:
+            if track.is_drum:
+                continue
+            if track.program == 32:
+                track_idx = 0
+            if track.program == 24:
+                track_idx = 1
+            if track.program == 0:
+                track_idx = 2
+            if track.program == 48:
+                track_idx = 3
+            for note in track.notes:
+                start_time = note.start
+                duration = note.duration
+                pitch = note.pitch
+                multi_prmat_2c[track_idx, 0, start_time, pitch] = 1.0
+                for d in range(1, duration):
+                    if start_time + d < 128:
+                        multi_prmat_2c[track_idx, 1, start_time + d, pitch] = 1.0
+        
+        chord = midi_to_one_hot_chd(train_midi_fpath, train_midi_fpath[:-4]+".out")
+        np.savez(os.path.join(train_folder,f"{train_idx}.npz"),{
+            "multi_prmat_2c":multi_prmat_2c,
+            "onehot_chord":chord
+        })
+    print(f"Training NPZs saved succeeded at {train_folder}")
+
+    for val_idx, val_midi_fpath in tqdm(enumerate(val_midi_fpaths)):
+        music = muspy.read_midi(val_midi_fpath)
+        multi_prmat_2c = np.zeros((4,2,128,128))
+        for track in music.tracks:
+            if track.is_drum:
+                continue
+            if track.program == 32:
+                track_idx = 0
+            if track.program == 24:
+                track_idx = 1
+            if track.program == 0:
+                track_idx = 2
+            if track.program == 48:
+                track_idx = 3
+            for note in track.notes:
+                start_time = note.start
+                duration = note.duration
+                pitch = note.pitch
+                multi_prmat_2c[track_idx, 0, start_time, pitch] = 1.0
+                for d in range(1, duration):
+                    if start_time + d < 128:
+                        multi_prmat_2c[track_idx, 1, start_time + d, pitch] = 1.0
+        
+        chord = midi_to_one_hot_chd(val_midi_fpath, val_midi_fpath[:-4]+".out")
+        np.savez(os.path.join(val_folder,f"{val_idx}.npz"),{
+            "multi_prmat_2c":multi_prmat_2c,
+            "onehot_chord":chord
+        })
+    print(f"Validating NPZs saved succeeded at {val_folder}")
+
+if __name__ == "__main__":
+    midi_to_npz()

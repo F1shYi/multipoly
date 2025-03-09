@@ -51,9 +51,8 @@ def chd_pitch_shift(chd, shift):
     return chd
 
 def pr_mat_pitch_shift(pr_mat, shift):
-    pr_mat = pr_mat.copy()
-    pr_mat = np.roll(pr_mat, shift, -1)
-    return pr_mat
+    return np.roll(pr_mat, shift, -1)
+    
 
 def chd_to_onehot(chd):
     n_step = chd.shape[0]
@@ -71,6 +70,12 @@ def onehot_to_chd(onehot):
     chd[:, 1:13] = onehot[:, 12:24]
     chd[:, 13] = np.argmax(onehot[:, 24:36], axis=1)
     return chd
+
+def onehot_chd_pitch_shift(onehot, shift):
+    ret = np.zeros_like(onehot)
+    for i in range(3):
+        ret[:, 12*i:12*i+12] = np.roll(onehot[:, 12*i:12*i+12], shift=shift, axis=-1)
+    return ret
 
 def get_note_matrix(music: muspy.Music, track_dict):
 
