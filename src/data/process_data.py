@@ -184,7 +184,7 @@ def midi_to_npz():
                         multi_prmat_2c[track_idx, 1, start_time + d, pitch] = 1.0
         
         chord = midi_to_one_hot_chd(train_midi_fpath, train_midi_fpath[:-4]+".out")
-        np.savez(os.path.join(train_folder,f"{train_idx}.npz"),{
+        np.savez(os.path.join(train_folder,f"{train_idx}.npz"),**{
             "multi_prmat_2c":multi_prmat_2c,
             "onehot_chord":chord
         })

@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from torch.utils.data import Dataset
-from .utils import nmat_to_multi_prmat2c
+from data.utils import nmat_to_multi_prmat2c
 
 SEG_LGTH = 32
 N_BIN = 4
@@ -125,6 +125,31 @@ class LMDDataset(Dataset):
         song_data = self.data_samples[song_no]
         return song_data[song_item]
 
+
+
+
 class EightBarSegmentDataset(Dataset):
-    def __init__(self, data_folders):
-        pass
+    def __init__(self, data_folder):
+     
+        self.data_fpaths = [os.path.join(data_folder, path) for path in os.listdir(data_folder)]
+    def __len__(self):
+        return len(self.data_fpaths) 
+    def __getitem__(self, index):
+
+        data = np.load(self.data_fpaths[index],allow_pickle=True)
+        multi_prmat2c = data["multi_prmat_2c"]
+        onehot_chord = data["onehot_chord"]
+
+        return multi_prmat2c, onehot_chord
+    
+if __name__ == "__main__":
+    training_folder = "/root/autodl-tmp/multipoly/data/train"
+    train_ds = EightBarSegmentDataset(training_folder)
+    print(len(train_ds))
+
+    multi_prmat2c, onehot_chord = train_ds[20]
+    print(multi_prmat2c.shape, onehot_chord.shape)
+    from data.utils import prmat2c_to_midi_file, chd_to_midi_file
+
+    prmat2c_to_midi_file(np.sum(multi_prmat2c, axis=0),"dataset_test.mid")
+    chd_to_midi_file(onehot_chord, "dataset_test_chord.mid")
