@@ -29,9 +29,9 @@ training:
   optim: "adam"
   lr: 1.0e-5
   accumulation_steps: 10
-  warmup_steps: 8000
+  warmup_steps: 200
   decay_factor: 0.2
-  decay_interval: 10000
+  decay_interval: 1000
 
 validation:
   num_seg: 1

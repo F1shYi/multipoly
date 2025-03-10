@@ -95,7 +95,7 @@ class Learner:
         self.step = 0
         self.accumulation_steps = config["training"]["accumulation_steps"]
         self.log_train_loss_interval = 200
-        self.validation_interval = 5000
+        self.validation_interval = 2000
         self.best_val_loss = 1e10
         
     
