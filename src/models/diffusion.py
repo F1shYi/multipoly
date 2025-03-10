@@ -185,6 +185,9 @@ class Diffusion(nn.Module):
         xt = self.q_sample(x0, t, eps=noise)
         cond = self._encoder_chord(chord)
 
+        if random.random() < 0.2:
+            cond = (-torch.ones_like(cond)).to(self.device)
+
         t = torch.cat([t.reshape(-1,1)]*track_num, dim=1).reshape(-1,)
         cond = torch.cat([cond]*track_num, dim=1).reshape(-1,1,512)
         

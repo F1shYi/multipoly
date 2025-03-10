@@ -239,9 +239,14 @@ def nmat_to_multi_prmat2c(nmat, n_step,track_num):
 
     return pr_mat
 
-    
+def custom_round(x):
+    if x > 0.95 and x < 1.05:
+        return 1
+    else:
+        return 0
+
 def prmat2c_to_midi_file(
-    prmat2c, fpath
+    prmat2c, fpath, is_custom_round = True
 ):
     '''
     single track prmat2c to midi
@@ -257,7 +262,10 @@ def prmat2c_to_midi_file(
     sustain = prmat2c[1]
     for step_ind, step in enumerate(onset):
         for key, on in enumerate(step):
-            on = int(round(on))
+            if is_custom_round:
+                on = int(custom_round(on))
+            else:
+                on = int(round(on))
             if on > 0:
                 dur = 1
                 while step_ind + dur < n_step:
@@ -273,6 +281,47 @@ def prmat2c_to_midi_file(
                 origin.notes.append(note)
     
     midi.instruments.append(origin)
+    midi.write(fpath)
+
+def multi_prmat2c_to_midi_file(multi_prmat2c, fpath, is_custom_round = True):
+    #         if track.program == 32:
+    #             track_idx = 0
+    #         if track.program == 24:
+    #             track_idx = 1
+    #         if track.program == 0:
+    #             track_idx = 2
+    #         if track.program == 48:
+    #             track_idx = 3
+    programs = [32,24,0,48]
+    midi = pm.PrettyMIDI()
+    for track_idx, program in enumerate(programs):
+        prmat2c = multi_prmat2c[track_idx]
+    
+        instrument = pm.Instrument(program=program, is_drum=False)
+        n_step = prmat2c.shape[1]
+        onset = prmat2c[0]
+        sustain = prmat2c[1]
+        for step_ind, step in enumerate(onset):
+            for key, on in enumerate(step):
+                if is_custom_round:
+                    on = int(custom_round(on))
+                else:
+                    on = int(round(on))
+                if on > 0:
+                    dur = 1
+                    while step_ind + dur < n_step:
+                        if not (int(round(sustain[step_ind + dur, key])) > 0):
+                            break
+                        dur += 1
+                    note = pm.Note(
+                        velocity=80,
+                        pitch=key,
+                        start=step_ind * 1 / 8,
+                        end=(step_ind + dur) * 1 / 8,
+                    )
+                    instrument.notes.append(note)
+        
+        midi.instruments.append(instrument)
     midi.write(fpath)
 
 

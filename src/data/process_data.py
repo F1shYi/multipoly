@@ -6,7 +6,7 @@
 import muspy
 import numpy as np
 from typing import List
-from data.utils import midi_to_one_hot_chd
+from data.utils import midi_to_one_hot_chd, chd_to_midi_file, multi_prmat2c_to_midi_file
 
 
 def get_track_idx(is_drum = None, program_num = None, track_name = None):
@@ -144,7 +144,7 @@ def midi2seg():
 
 
 def midi_to_npz():
-    midi_folder = "/root/autodl-tmp/multipoly/data/segments"
+    midi_folder = "/root/autodl-tmp/multipoly/data/segments_filtered"
     train_folder = "/root/autodl-tmp/multipoly/data/train"
     val_folder = "/root/autodl-tmp/multipoly/data/val"
     import os
@@ -155,14 +155,14 @@ def midi_to_npz():
     all_midi_fpaths = [os.path.join(midi_folder, path) for path in os.listdir(midi_folder) if path.endswith(".mid")]
     random.shuffle(all_midi_fpaths)
     
-    train_length = int(len(all_midi_fpaths)*0.8)
+    train_length = int(len(all_midi_fpaths)*0.9)
 
     train_midi_fpaths = all_midi_fpaths[:train_length]
     val_midi_fpaths = all_midi_fpaths[train_length:]
     from tqdm import tqdm
     for train_idx, train_midi_fpath in tqdm(enumerate(train_midi_fpaths)):
         music = muspy.read_midi(train_midi_fpath)
-        multi_prmat_2c = np.zeros((4,2,128,128))
+        multi_prmat_2c = np.zeros((4,2,128,128),dtype=np.float32)
         for track in music.tracks:
             if track.is_drum:
                 continue
@@ -192,7 +192,7 @@ def midi_to_npz():
 
     for val_idx, val_midi_fpath in tqdm(enumerate(val_midi_fpaths)):
         music = muspy.read_midi(val_midi_fpath)
-        multi_prmat_2c = np.zeros((4,2,128,128))
+        multi_prmat_2c = np.zeros((4,2,128,128),dtype=np.float32)
         for track in music.tracks:
             if track.is_drum:
                 continue
@@ -214,11 +214,79 @@ def midi_to_npz():
                         multi_prmat_2c[track_idx, 1, start_time + d, pitch] = 1.0
         
         chord = midi_to_one_hot_chd(val_midi_fpath, val_midi_fpath[:-4]+".out")
-        np.savez(os.path.join(val_folder,f"{val_idx}.npz"),{
+        np.savez(os.path.join(val_folder,f"{val_idx}.npz"),**{
             "multi_prmat_2c":multi_prmat_2c,
             "onehot_chord":chord
         })
     print(f"Validating NPZs saved succeeded at {val_folder}")
 
+
+def filter_midi():
+    IN_FOLDER = "/root/autodl-tmp/multipoly/data/segments"
+    OUT_FOLDER = "/root/autodl-tmp/multipoly/data/segments_filtered"
+    
+    from tqdm import tqdm
+    import os
+    os.makedirs(OUT_FOLDER, exist_ok=True)
+    all_midi_fpaths = [os.path.join(IN_FOLDER, path) for path in os.listdir(IN_FOLDER) if path.endswith(".mid")]
+    cnt = 0
+    for midi_fpath in tqdm(all_midi_fpaths):
+        music = muspy.read_midi(midi_fpath)
+        ok_music = True
+        for track in music.tracks:
+            # piano avg notes count: 93.3577
+            # guitar avg notes count: 115.5076
+            # bass avg notes count: 38.8402
+            # drums avg notes count: 166.7206
+            # strings avg notes count: 4999.5
+
+            if track.is_drum:
+                continue
+
+            if track.program == 32: # bass
+                if len(track) < 50:
+                    ok_music = False
+                    break
+   
+            if track.program == 24: # guitar
+                if len(track) < 120:
+                    ok_music = False
+                    break
+
+            if track.program == 0: # piano
+                if len(track) < 100:
+                    ok_music = False
+                    break
+
+            if track.program == 48: # string
+                if len(track) > 2500:
+                    ok_music = False
+                    break
+    
+        if ok_music == False:
+            continue
+        else:
+            save_fpath = os.path.join(OUT_FOLDER,f"filtered_{cnt}.mid")
+            cnt += 1
+            music.write_midi(save_fpath)
+    print(f"After filtering: {cnt}")
+            
+
+def check_valid(folder):
+    import os
+    from tqdm import tqdm
+    all_npz_fpaths = [os.path.join(folder, path) for path in os.listdir(folder) if path.endswith(".npz")]
+    invalid_npz_fpaths = []
+    for fpath in all_npz_fpaths:
+        data = np.load(fpath, allow_pickle=True)
+        prmat = data["multi_prmat_2c"]
+        chord = data["onehot_chord"]
+        if prmat.shape != (4,2,128,128) or chord.shape != (32,36):
+            invalid_npz_fpaths.append(fpath)
+    print(len(invalid_npz_fpaths))
+    for invalid_npz_fpath in invalid_npz_fpaths:
+        os.remove(invalid_npz_fpath)
+       
+
 if __name__ == "__main__":
-    midi_to_npz()
+    check_valid("/root/autodl-tmp/multipoly/data/val")

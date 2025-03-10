@@ -401,7 +401,7 @@ class Experiments:
 
 
 if __name__ == "__main__":
-    parser.add_argument("--chkpt_path", help="the path of the checkpoint to be used")
+    parser.add_argument("--chkpt_path", help="the path of the checkpoint to be used", default="/root/autodl-tmp/multipoly/polyffusion_ckpts/ldm_chd8bar/sdf+pop909wm_mix16_chd8bar/01-11_102022/chkpts/weights_best.pt")
     parser.add_argument(
         "--custom_params_path",
         help="the path of custom parameters, default load from 'params.yaml/json' in the parent folder of the checkpoint",

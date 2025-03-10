@@ -519,6 +519,7 @@ class UNetModel(nn.Module):
             # first zero out all parameters
             for params in self.parameters():
                 params.data.fill_(0.0)
+            print("params zeroed.")
         # then load polyffusion checkpoints
         unet_from_polyffusion_state_dict = {
             k.removeprefix("ldm.eps_model."): v

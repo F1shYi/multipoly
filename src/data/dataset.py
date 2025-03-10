@@ -132,14 +132,15 @@ class EightBarSegmentDataset(Dataset):
     def __init__(self, data_folder):
      
         self.data_fpaths = [os.path.join(data_folder, path) for path in os.listdir(data_folder)]
+        self.datas = [np.load(self.data_fpaths[index],allow_pickle=True) for index in range(len(self.data_fpaths))]
     def __len__(self):
         return len(self.data_fpaths) 
     def __getitem__(self, index):
 
-        data = np.load(self.data_fpaths[index],allow_pickle=True)
+        data = self.datas[index]
         multi_prmat2c = data["multi_prmat_2c"]
         onehot_chord = data["onehot_chord"]
-
+        
         return multi_prmat2c, onehot_chord
     
 if __name__ == "__main__":

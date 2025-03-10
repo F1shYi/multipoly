@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 import os
-from .dataset import LMDDataset,DataSampleNpz
+from .dataset import LMDDataset,DataSampleNpz,EightBarSegmentDataset
 from .utils import (
     onehot_chd_pitch_shift,
     chd_to_midi_file,
@@ -11,7 +11,6 @@ from .utils import (
 )
 
 def collate_fn(batch, shift):
-
     
     prmat2cs = []
     chords = []
@@ -32,47 +31,18 @@ def collate_fn(batch, shift):
     return ret_prmat2cs, ret_chords
 
 
-def get_train_val_dataloaders(
-    data_folder:str, batch_size:int, num_workers=0,train_ratio=0.9, pin_memory=False, return_split=False
+def get_train_val_datas(
+    train_folder:str,val_folder:str, train_bs:int, val_bs:int, num_workers=0, pin_memory=False
 ):
-    
-    all_fpaths = [fpath for fpath in os.listdir(data_folder) if fpath.endswith(".npz")]
-    all_fpaths = np.array(all_fpaths)
-    np.random.shuffle(all_fpaths)
-    train_num = int(len(all_fpaths)*train_ratio)
-    val_num = len(all_fpaths) - train_num
+    train_ds = EightBarSegmentDataset(train_folder)
+    val_ds = EightBarSegmentDataset(val_folder)
+    train_dl = DataLoader(train_ds, batch_size=train_bs, shuffle=True,
+                        collate_fn=lambda x: collate_fn(x, shift=True),
+                        pin_memory=pin_memory, num_workers=num_workers)
+    val_dl = DataLoader(val_ds, batch_size=val_bs, shuffle=True,
+                        collate_fn=lambda x: collate_fn(x, shift=True),
+                        pin_memory=pin_memory, num_workers=num_workers)
+    return train_ds, val_ds, train_dl, val_dl
 
-    train_fpaths = all_fpaths[:train_num]
-    val_fpaths = all_fpaths[train_num+1:]
-
-    train_samples = [DataSampleNpz(os.path.join(data_folder,data_fpath)) for data_fpath in train_fpaths]
-    val_samples = [DataSampleNpz(os.path.join(data_folder,data_fpath)) for data_fpath in val_fpaths]
-
-    train_dataset = LMDDataset(train_samples)
-    val_dataset = LMDDataset(val_samples)
-
-    train_dl = DataLoader(
-        train_dataset,
-        batch_size,
-        True,
-        collate_fn=lambda x: collate_fn(x, shift=True),
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-    )
-    val_dl = DataLoader(
-        val_dataset,
-        batch_size,
-        False,
-        collate_fn=lambda x: collate_fn(x, shift=False),
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-    )
-    print(
-        f"Dataloader ready: batch_size={batch_size}, num_workers={num_workers}, pin_memory={pin_memory}, train_segments={len(train_dataset)}, val_segments={len(val_dataset)}"
-    )
-    if return_split:
-        return (train_dataset, train_dl), (val_dataset, val_dl), train_fpaths, val_fpaths
-    else:
-        return (train_dataset, train_dl),(val_dataset, val_dl)
-
+   
 
