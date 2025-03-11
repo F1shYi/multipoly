@@ -10,7 +10,7 @@ def load_config(config_path):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Parse command-line arguments.")
-    parser.add_argument("--config", type=str, required=False, help="Directory to save config files.", default="src/configs/params_v1_v1.yaml")
+    parser.add_argument("--config", type=str, required=False, help="Directory to save config files.", default="src/configs/params_v1_v4.yaml")
     
     args = parser.parse_args()
     

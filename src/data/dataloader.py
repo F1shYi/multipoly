@@ -40,7 +40,7 @@ def get_train_val_datas(
                         collate_fn=lambda x: collate_fn(x, shift=True),
                         pin_memory=pin_memory, num_workers=num_workers)
     val_dl = DataLoader(val_ds, batch_size=val_bs, shuffle=True,
-                        collate_fn=lambda x: collate_fn(x, shift=True),
+                        collate_fn=lambda x: collate_fn(x, shift=False),
                         pin_memory=pin_memory, num_workers=num_workers)
     return train_ds, val_ds, train_dl, val_dl
 
