@@ -93,9 +93,13 @@ class Learner:
         self.writer = SummaryWriter(self.log_dir)
         self.epoch = 0
         self.step = 0
+        
         self.accumulation_steps = config["training"]["accumulation_steps"]
-        self.log_train_loss_interval = 200
-        self.validation_interval = 2000
+        self.log_train_loss_interval = config["training"]["log_train_loss_interval"]
+        self.validation_interval = config["training"]["validation_interval"]
+        self.generate_chord_conditioned_samples_interval = config["training"]["generate_chord_conditioned_samples_interval"]
+        self.generate_track_given_samples_interval = config["training"]["generate_track_given_samples_interval"]
+        
         self.best_val_loss = 1e10
         
     
@@ -129,6 +133,15 @@ class Learner:
                 
                 if (self.step + 1) % self.validation_interval == 0:
                     self.validation_step()
+                    self.diffusion.train()
+
+                if (self.step + 1) % self.generate_chord_conditioned_samples_interval == 0:
+                    self.generate_chord_conditioned_samples()
+                    self.diffusion.train()
+
+                if (self.step + 1) % self.generate_track_given_samples_interval == 0:
+                    self.generate_track_given_samples()
+                    self.diffusion.train()
 
                 self.step += 1
 
@@ -138,6 +151,7 @@ class Learner:
 
             self.epoch += 1
     
+    @torch.no_grad()
     def validation_step(self):
         from tqdm import tqdm
         self.diffusion.eval()
@@ -157,7 +171,9 @@ class Learner:
             self.best_val_loss = val_loss
             self.save_checkpoint(True)   
 
-
+    @torch.no_grad()
+    def generate_chord_conditioned_samples(self):
+        self.diffusion.eval()
         NAME = ["bass", "guitar", "piano", "string"]
         for seg_idx, seg in enumerate(self.val_segs):        
             multi_prmat, chord = seg
@@ -169,23 +185,31 @@ class Learner:
             
             for gen_idx in range(self.val_num_gen):
                 print(f"generating song {gen_idx} for validation segment {seg_idx} at step {self.step}")
-                gen_folder = os.path.join(save_folder, f"gen_{gen_idx}")
-                os.makedirs(gen_folder, exist_ok=True)
 
-                gen = self.diffusion.sample(
-                shape=[1,4,2,128,128],
-                chords=chord,
-                uncond_scale=5.0,
-                uncond_cond=-(torch.ones([1,1,512])).to(self.device))
-                gen = gen.detach().cpu().numpy()[0]
+                for uncond_scale in [0.5,2.0,5.0]:
 
-                multi_prmat2c_to_midi_file(gen, os.path.join(gen_folder,f"multi.mid"))
-                for track_idx, track in enumerate(gen):
-                    midi_fpath = os.path.join(gen_folder, f"track_{NAME[track_idx]}.mid")
-                    prmat2c_to_midi_file(track, midi_fpath)
+                    gen_folder = os.path.join(save_folder, f"scale_{uncond_scale}",f"gen_{gen_idx}")
+                    os.makedirs(gen_folder, exist_ok=True)
 
-        self.diffusion.train()      
+                    gen = self.diffusion.sample(
+                    shape=[1,4,2,128,128],
+                    chords=chord,
+                    uncond_scale=uncond_scale,
+                    uncond_cond=-(torch.ones([1,1,512])).to(self.device))
+                    gen = gen.detach().cpu().numpy()[0]
 
+                    multi_prmat2c_to_midi_file(gen, os.path.join(gen_folder,f"multi.mid"))
+                    for track_idx, track in enumerate(gen):
+                        midi_fpath = os.path.join(gen_folder, f"track_{NAME[track_idx]}.mid")
+                        prmat2c_to_midi_file(track, midi_fpath)
+
+           
+    
+    @torch.no_grad()
+    def generate_track_given_samples(self):
+        # TODO
+        pass
+       
 
 
     def save_checkpoint(self,is_best = False):
@@ -207,8 +231,3 @@ class Learner:
         self.epoch = checkpoint['epoch'] + 1
         self.step = checkpoint['step'] + 1
         print(f"Checkpoint loaded from {checkpoint_path}, resuming from epoch {self.epoch} and step {self.step}")
-      
-
-
-
-    

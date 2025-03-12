@@ -32,6 +32,8 @@ training:
   warmup_steps: 200
   decay_factor: 0.2
   decay_interval: 1000
+  log_train_loss_interval: 100
+  validation_interval: 5000
 
 validation:
   num_seg: 1

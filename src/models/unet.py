@@ -22,6 +22,8 @@ class InterTrackAttention(nn.Module):
         n_intertrack_head,
         d_intertrack_ff,
         num_intertrack_encoder_layers,
+
+        track_num = 4
     ):
         super().__init__()
         encoder = nn.TransformerEncoderLayer(
@@ -34,6 +36,7 @@ class InterTrackAttention(nn.Module):
         self.attention = nn.TransformerEncoder(
             encoder, num_layers=num_intertrack_encoder_layers
         )
+        self.track_embedding = nn.Parameter(torch.randn((1, track_num, d_intertrack_encoder)), requires_grad=True)
 
     def forward(self, input_tensor):
         """
@@ -41,7 +44,7 @@ class InterTrackAttention(nn.Module):
         Output: a tensor of shape (N, L, C)
         """
 
-        output_tensor = input_tensor + self.attention(input_tensor)
+        output_tensor = input_tensor + self.attention(input_tensor + self.track_embedding)
         return output_tensor
 
 
@@ -145,7 +148,7 @@ class BasicTransformerBlock(nn.Module):
         x = self.attn2(self.norm2(x), cond=cond) + x
         # Feed-forward network
         x = self.ff(self.norm3(x)) + x
-        #
+        
         return x
 
 
@@ -553,17 +556,7 @@ class UNetModel(nn.Module):
             if name in self.polyffusion_weights_keys:
                 param.requires_grad = True
 
-    # def get_norm_of_trainable_params(self):
-    #     all_params = []
-    #     for param in self.parameters():
-    #         if param.requires_grad:
-    #             all_params.append(param.data.flatten())
-               
-        
-    #     norm = torch.norm(torch.cat(all_params))
-    #     return norm
     
-
 
     def time_step_embedding(self, time_steps: torch.Tensor, max_period: int = 10000):
         """
