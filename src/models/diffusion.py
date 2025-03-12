@@ -251,5 +251,66 @@ class Diffusion(nn.Module):
             
         return x
 
- 
+    
+    @torch.no_grad()
+    def paint(
+        self,
+        shape: List[int],
+        chords: Optional[torch.Tensor] = None,
+        
+        *,
+        orig: Optional[torch.Tensor] = None,
+        mask: Optional[torch.Tensor] = None,
+        uncond_scale: float = 1.0,
+        uncond_cond: Optional[torch.Tensor] = None,
+        repaint_n=1,
+        t_start: int = 0,
+    ):
+        
+        bs, track_num = shape[0], shape[1]
+
+        cond = None
+        if uncond_scale > 0.0:
+            single_track_cond = self._encoder_chord(chords)
+            cond = torch.cat([single_track_cond]*track_num, dim=1).reshape(-1,1,512)
+        if uncond_cond is not None:
+            uncond_cond = torch.cat([uncond_cond]*track_num, dim=1).reshape(-1,1,512)
+
+        x = torch.randn(shape, device=self.device)
+
+        time_steps = np.flip(self.time_steps)[t_start:]
+
+        from tqdm import tqdm
+        for step in tqdm(time_steps):
+            x_t = x
+            for u in range(repaint_n):
+                noise = (
+                        torch.randn_like(orig, device=orig.device)
+                        if step > 0
+                        else torch.zeros_like(orig, device=orig.device)
+                    )
+                x_kn_tm1 = self.q_sample(orig, torch.tensor(step, device=self.device, dtype=torch.long), eps=noise)   
+                ts = x_t.new_full((bs*track_num,), step, dtype=torch.long)
+                
+                x_unkn_tm1, _, _ = self.p_sample(
+                    x_t,
+                    cond,
+                    ts,
+                    step,
+                    uncond_scale=uncond_scale,
+                    uncond_cond=uncond_cond,
+                )
+
+                x = x_kn_tm1 * mask + x_unkn_tm1 * (1 - mask)
+                if u < repaint_n - 1 and step > 0:
+                    noise = torch.randn_like(orig, device=orig.device)
+                    x_t = (
+                        1 - self.beta[step - 1]
+                    ) ** 0.5 * x + self.beta[step - 1] * noise
+
+
+                
+
+        return x
+
 

@@ -26,5 +26,5 @@ def get_diffusion_from_ckpts(unet_trainable_params, diffusion_ckpts_fpath):
     chord_encoder = ChordEncoder(**CHORD_ENCODER_PARAMS_FIXED)
     diffusion = Diffusion(unet_model=unet,chord_encoder=chord_encoder, **DIFFUSION_PARAMS_FIXED)
     diffusion_checkpoint = torch.load(diffusion_ckpts_fpath)["model_state_dict"]
-    diffusion.load_state_dict(diffusion_checkpoint)
+    diffusion.load_state_dict(diffusion_checkpoint, strict=False)
     return diffusion

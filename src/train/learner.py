@@ -98,7 +98,7 @@ class Learner:
         self.log_train_loss_interval = config["training"]["log_train_loss_interval"]
         self.validation_interval = config["training"]["validation_interval"]
         self.generate_chord_conditioned_samples_interval = config["training"]["generate_chord_conditioned_samples_interval"]
-        self.generate_track_given_samples_interval = config["training"]["generate_track_given_samples_interval"]
+        self.generate_track_conditioned_samples_interval = config["training"]["generate_track_conditioned_samples_interval"]
         
         self.best_val_loss = 1e10
         
@@ -139,8 +139,8 @@ class Learner:
                     self.generate_chord_conditioned_samples()
                     self.diffusion.train()
 
-                if (self.step + 1) % self.generate_track_given_samples_interval == 0:
-                    self.generate_track_given_samples()
+                if (self.step + 1) % self.generate_track_conditioned_samples_interval == 0:
+                    self.generate_track_conditioned_samples()
                     self.diffusion.train()
 
                 self.step += 1
@@ -206,10 +206,46 @@ class Learner:
            
     
     @torch.no_grad()
-    def generate_track_given_samples(self):
-        # TODO
-        pass
-       
+    def generate_track_conditioned_samples(self):
+        self.diffusion.eval()
+        NAME = ["bass", "guitar", "piano", "string"]
+        for seg_idx, seg in enumerate(self.val_segs):        
+            multi_prmat, chord = seg
+            chord = torch.from_numpy(chord).to(self.device).reshape(1, *chord.shape)
+            
+            save_folder = os.path.join(self.val_dir, f"seg_{seg_idx}", f"step_{self.step}")
+            os.makedirs(save_folder, exist_ok=True)
+            
+            for gen_idx in range(self.val_num_gen):
+                print(f"generating song {gen_idx} for validation segment {seg_idx} at step {self.step}")
+
+                for keep_idx in [0,1,2,3]:
+                    for uncond_scale in [0.0,2.0,5.0]:
+                        gen_folder = os.path.join(save_folder, f"{NAME[keep_idx]}_scale_{uncond_scale}",f"gen_{gen_idx}")
+                        os.makedirs(gen_folder, exist_ok=True)
+
+                        orig = torch.tensor(multi_prmat)
+                        mask = torch.zeros_like(orig)
+
+                        mask[keep_idx] = torch.ones_like(mask[keep_idx])
+
+                        orig = orig.reshape(1, *orig.shape).to(self.device)
+                        mask = mask.reshape(1, *mask.shape).to(self.device)
+
+                        gen = self.diffusion.paint(
+                            shape=[1,4,2,128,128],
+                            orig=orig,
+                            mask=mask,
+                            chords=chord,
+                            uncond_scale=uncond_scale,
+                            uncond_cond=-(torch.ones([1,1,512])).to(self.device)
+                        )
+                        gen = gen.detach().cpu().numpy()[0]
+
+                        multi_prmat2c_to_midi_file(gen, os.path.join(gen_folder,f"multi.mid"))
+                        for track_idx, track in enumerate(gen):
+                            midi_fpath = os.path.join(gen_folder, f"track_{NAME[track_idx]}.mid")
+                            prmat2c_to_midi_file(track, midi_fpath)
 
 
     def save_checkpoint(self,is_best = False):
