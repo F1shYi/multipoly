@@ -115,36 +115,52 @@ def music_to_a_list_of_8bar_segments(music: muspy.Music, threshold: int) -> List
     return music_segments
     
 
-def midi2seg():
+def midi_to_train_val_segs():
     midi_folder = "/root/autodl-tmp/multipoly/data/lmd/lpd_5_midi/"
-    write_folder1 = "/root/autodl-tmp/multipoly/data/segments"
-    # write_folder2 = "/root/autodl-fs/segments"
+    train_folder = "/root/autodl-tmp/multipoly/data/train_segs"
+    val_folder = "/root/autodl-tmp/multipoly/data/val_segs"
 
     
 
-    seg_num = 0
+    train_seg_num = 0
+    val_seg_num = 0
     from tqdm import tqdm
     import os
 
-    os.makedirs(write_folder1, exist_ok=True)
-    # os.makedirs(write_folder2, exist_ok=True)
+    os.makedirs(train_folder, exist_ok=True)
+    os.makedirs(val_folder, exist_ok=True)
     all_midi_fpaths = [os.path.join(midi_folder, path) for path in os.listdir(midi_folder) if path.endswith(".mid")]
+
+    import random
 
     for midi_fpath in tqdm(all_midi_fpaths):
         music = muspy.read(midi_fpath)
         music_segments = music_to_a_list_of_8bar_segments(music, threshold=8)
-        for segment in (music_segments):
-            write_fpath1 = os.path.join(write_folder1, f"seg_{seg_num}.mid")
-            # write_fpath2 = os.path.join(write_folder2, f"set_{seg_num}.mid")
         
-            segment.write_midi(write_fpath1)
-            # segment.write_midi(write_fpath2)
-            seg_num += 1
-    print(f"Finishes processing with {seg_num} segments.")
+        if random.random() < 0.1:
+            write_mode = "val"
+        else:
+            write_mode = "train"
+        
+
+        for segment in (music_segments):
+
+            if write_mode == "val":
+                write_fpath = os.path.join(val_folder, f"seg_{val_seg_num}.mid")
+                segment.write_midi(write_fpath)
+                val_seg_num += 1
+            else:
+                write_fpath = os.path.join(train_folder, f"seg_{train_seg_num}.mid")
+                segment.write_midi(write_fpath)
+                train_seg_num += 1
+                
+            
+    print(f"Finishes processing with {train_seg_num} training segments and {val_seg_num} valid segments.")
 
 
 def midi_to_npz():
-    midi_folder = "/root/autodl-tmp/multipoly/data/segments_filtered"
+    train_midi_folder = "/root/autodl-tmp/multipoly/data/train_segs_filtered"
+    val_midi_folder = "/root/autodl-tmp/multipoly/data/val_segs_filtered"
     train_folder = "/root/autodl-tmp/multipoly/data/train"
     val_folder = "/root/autodl-tmp/multipoly/data/val"
     import os
@@ -152,13 +168,9 @@ def midi_to_npz():
     os.makedirs(train_folder, exist_ok=True)
     os.makedirs(val_folder, exist_ok=True)
 
-    all_midi_fpaths = [os.path.join(midi_folder, path) for path in os.listdir(midi_folder) if path.endswith(".mid")]
-    random.shuffle(all_midi_fpaths)
+    train_midi_fpaths = [os.path.join(train_midi_folder, path) for path in os.listdir(train_midi_folder) if path.endswith(".mid")]
+    val_midi_fpaths = [os.path.join(val_midi_folder, path) for path in os.listdir(val_midi_folder) if path.endswith(".mid")]
     
-    train_length = int(len(all_midi_fpaths)*0.9)
-
-    train_midi_fpaths = all_midi_fpaths[:train_length]
-    val_midi_fpaths = all_midi_fpaths[train_length:]
     from tqdm import tqdm
     for train_idx, train_midi_fpath in tqdm(enumerate(train_midi_fpaths)):
         music = muspy.read_midi(train_midi_fpath)
@@ -222,8 +234,8 @@ def midi_to_npz():
 
 
 def filter_midi():
-    IN_FOLDER = "/root/autodl-tmp/multipoly/data/segments"
-    OUT_FOLDER = "/root/autodl-tmp/multipoly/data/segments_filtered"
+    IN_FOLDER = "/root/autodl-tmp/multipoly/data/val_segs"
+    OUT_FOLDER = "/root/autodl-tmp/multipoly/data/val_segs_filtered"
     
     from tqdm import tqdm
     import os
@@ -244,7 +256,7 @@ def filter_midi():
                 continue
 
             if track.program == 32: # bass
-                if len(track) < 50:
+                if len(track) < 40:
                     ok_music = False
                     break
    
@@ -289,4 +301,4 @@ def check_valid(folder):
        
 
 if __name__ == "__main__":
-    check_valid("/root/autodl-tmp/multipoly/data/val")
+    midi_to_npz()
