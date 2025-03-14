@@ -301,4 +301,4 @@ def check_valid(folder):
        
 
 if __name__ == "__main__":
-    midi_to_npz()
+    check_valid("/root/autodl-tmp/multipoly/data/val")
