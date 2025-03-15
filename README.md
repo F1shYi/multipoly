@@ -28,3 +28,6 @@ a tuple of multitrack_pianoroll_2channel, chord.
 
 表示方法：128*（鼓pitch range）的图片。
 condition:multi prmat 2c，如何加？cross attn.? 
+
+鼓：128*128*1 图片。
+diffusion with others conditioned
