@@ -1,4 +1,10 @@
-from models.unet_modules import DownSample, ResBlock, UpSample, normalization
+from models.unet_modules import (
+    DownSample,
+    ResBlock,
+    UpSample,
+    normalization,
+    DrumSequential,
+)
 
 import math
 from typing import List, Optional
@@ -18,6 +24,13 @@ class DrumUNet(nn.Module):
     and predicts the noise to be denoised from `d_t` to get `d_{t-1}`.
     """
 
+    def _get_time_embed(self, channels, d_time_emb) -> nn.Sequential:
+        return nn.Sequential(
+            nn.Linear(channels, d_time_emb),
+            nn.SiLU(),
+            nn.Linear(d_time_emb, d_time_emb),
+        )
+
     def __init__(
         self,
         drum_in_channels: int,
@@ -36,107 +49,119 @@ class DrumUNet(nn.Module):
             n_res_blocks: number of residual blocks at each level
             channel_multipliers: are the multiplicative factors for number of channels for each level
         """
-
+        super().__init__()
         self.channels = channels
+
         levels = len(channel_multipliers)
-
         d_time_emb = channels * 4
-        self.time_embeds = [
-            nn.Sequential(
-                nn.Linear(channels, d_time_emb),
-                nn.SiLU(),
-                nn.Linear(d_time_emb, d_time_emb),
-            ),
-            nn.Sequential(
-                nn.Linear(channels, d_time_emb),
-                nn.SiLU(),
-                nn.Linear(d_time_emb, d_time_emb),
-            ),
-            nn.Sequential(
-                nn.Linear(channels, d_time_emb),
-                nn.SiLU(),
-                nn.Linear(d_time_emb, d_time_emb),
-            ),
-        ]
+        self.d_t_time_embed = self._get_time_embed(channels, d_time_emb)
+        self.m_t_time_embed = self._get_time_embed(channels, d_time_emb)
+        self.m_t_minus_1_time_embed = self._get_time_embed(channels, d_time_emb)
 
-        self.in_projs = [
-            nn.Conv2d(drum_in_channels, channels, 3, padding=1),
-            nn.Conv2d(multitrack_in_channels, channels, 3, padding=1),
-            nn.Conv2d(multitrack_in_channels, channels, 3, padding=1),
-        ]
+        self.d_t_input_blocks = nn.ModuleList()
+        self.m_t_input_blocks = nn.ModuleList()
+        self.m_t_minus_1_input_blocks = nn.ModuleList()
 
-        self.input_blocks = [nn.ModuleList(), nn.ModuleList(), nn.ModuleList()]
+        self.d_t_input_blocks.append(
+            DrumSequential(
+                nn.Conv2d(drum_in_channels, channels, kernel_size=3, padding=1)
+            )
+        )
+        self.m_t_input_blocks.append(
+            DrumSequential(
+                nn.Conv2d(multitrack_in_channels, channels, kernel_size=3, padding=1)
+            )
+        )
+        self.m_t_minus_1_input_blocks.append(
+            DrumSequential(
+                nn.Conv2d(multitrack_in_channels, channels, kernel_size=3, padding=1)
+            )
+        )
 
         input_block_channels = [channels]
         channels_list = [channels * m for m in channel_multipliers]
         for i in range(levels):
             for _ in range(n_res_blocks):
-                layers = [
-                    ResBlock(channels, d_time_emb, out_channels=channels_list[i]),
-                    ResBlock(channels, d_time_emb, out_channels=channels_list[i]),
-                    ResBlock(channels, d_time_emb, out_channels=channels_list[i]),
+
+                d_t_layers = [
+                    ResBlock(channels, d_time_emb, out_channels=channels_list[i])
+                ]
+                m_t_layers = [
+                    ResBlock(channels, d_time_emb, out_channels=channels_list[i])
+                ]
+                m_t_minus_1_layers = [
+                    ResBlock(channels, d_time_emb, out_channels=channels_list[i])
                 ]
                 channels = channels_list[i]
-                for ii in range(3):
-                    self.input_blocks[ii].append(layers[ii])
-
+                self.d_t_input_blocks.append(DrumSequential(*d_t_layers))
+                self.m_t_input_blocks.append(DrumSequential(*m_t_layers))
+                self.m_t_minus_1_input_blocks.append(
+                    DrumSequential(*m_t_minus_1_layers)
+                )
                 input_block_channels.append(channels)
             if i != levels - 1:
-                for ii in range(3):
-                    self.input_blocks[ii].append(DownSample(channels))
-
+                self.d_t_input_blocks.append(DrumSequential(DownSample(channels)))
+                self.m_t_input_blocks.append(DrumSequential(DownSample(channels)))
+                self.m_t_minus_1_input_blocks.append(
+                    DrumSequential(DownSample(channels))
+                )
                 input_block_channels.append(channels)
 
-        self.middle_blocks = [
-            nn.Sequential(
-                ResBlock(channels, d_time_emb),
-                ResBlock(channels, d_time_emb),
-            ),
-            nn.Sequential(
-                ResBlock(channels, d_time_emb),
-                ResBlock(channels, d_time_emb),
-            ),
-            nn.Sequential(
-                ResBlock(channels, d_time_emb),
-                ResBlock(channels, d_time_emb),
-            ),
-        ]
+        self.d_t_middle_block = DrumSequential(
+            ResBlock(channels, d_time_emb),
+            ResBlock(channels, d_time_emb),
+        )
+        self.m_t_middle_block = DrumSequential(
+            ResBlock(channels, d_time_emb),
+            ResBlock(channels, d_time_emb),
+        )
+        self.m_t_minus_1_middle_block = DrumSequential(
+            ResBlock(channels, d_time_emb),
+            ResBlock(channels, d_time_emb),
+        )
 
-        self.output_blocks = [nn.ModuleList([]), nn.ModuleList([]), nn.ModuleList([])]
+        self.d_t_output_blocks = nn.ModuleList([])
+        self.m_t_output_blocks = nn.ModuleList([])
+        self.m_t_minus_1_output_blocks = nn.ModuleList([])
+
         for i in reversed(range(levels)):
             for j in range(n_res_blocks + 1):
-                layers = [
-                    [
-                        ResBlock(
-                            channels + input_block_channels.pop(),
-                            d_time_emb,
-                            out_channels=channels_list[i],
-                        )
-                    ],
-                    [
-                        ResBlock(
-                            channels + input_block_channels.pop(),
-                            d_time_emb,
-                            out_channels=channels_list[i],
-                        )
-                    ],
-                    [
-                        ResBlock(
-                            channels + input_block_channels.pop(),
-                            d_time_emb,
-                            out_channels=channels_list[i],
-                        )
-                    ],
+                pop_channel = input_block_channels.pop()
+                d_t_layers = [
+                    ResBlock(
+                        channels + pop_channel,
+                        d_time_emb,
+                        out_channels=channels_list[i],
+                    )
+                ]
+                m_t_layers = [
+                    ResBlock(
+                        channels + pop_channel,
+                        d_time_emb,
+                        out_channels=channels_list[i],
+                    )
+                ]
+                m_t_minus_1_layers = [
+                    ResBlock(
+                        channels + pop_channel,
+                        d_time_emb,
+                        out_channels=channels_list[i],
+                    )
                 ]
                 channels = channels_list[i]
+
                 if i != 0 and j == n_res_blocks:
-                    for layer in layers:
-                        layer.append(UpSample(channels))
+                    d_t_layers.append(UpSample(channels))
+                    m_t_layers.append(UpSample(channels))
+                    m_t_minus_1_layers.append(UpSample(channels))
 
-                for ii in range(3):
-                    self.output_blocks[ii].append(layers[ii])
+                self.d_t_output_blocks.append(DrumSequential(*d_t_layers))
+                self.m_t_output_blocks.append(DrumSequential(*m_t_layers))
+                self.m_t_minus_1_output_blocks.append(
+                    DrumSequential(*m_t_minus_1_layers)
+                )
 
-        self.out_proj = nn.Sequential(
+        self.drum_out_proj = nn.Sequential(
             normalization(channels),
             nn.SiLU(),
             nn.Conv2d(channels, drum_out_channels, 3, padding=1),
@@ -158,6 +183,9 @@ class DrumUNet(nn.Module):
         args = time_steps[:, None].float() * frequencies[None]
         return torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
 
+    def _mask(self, d_t, m_t, m_t_minus_1):
+        return d_t + F.tanh(m_t) * d_t + F.tanh(m_t_minus_1) * d_t
+
     def forward(
         self,
         m_t: torch.Tensor,
@@ -177,34 +205,52 @@ class DrumUNet(nn.Module):
             torch.Tensor: Output tensor of shape `[batch_size, out_channels, width, height]`.
         """
 
-        hs = [
-            self.in_projs[0](d_t),
-            self.in_projs[1](m_t),
-            self.in_projs[2](m_t_minus_1),
-        ]
-        ts = [
-            self.time_step_embedding(t),
-            self.time_step_embedding(t),
-            self.time_step_embedding(t - 1),
-        ]
-        ts = [
-            self.time_embeds[0](ts[0]),
-            self.time_embeds[1](ts[1]),
-            self.time_embeds[2](ts[2]),
-        ]
+        batch_size, track_num, multitrack_channels, width, height = m_t.shape
 
-        len_0 = len(self.input_blocks[0])
-        len_1 = len(self.input_blocks[1])
-        len_2 = len(self.input_blocks[2])
+        m_t = m_t.reshape(batch_size, track_num * multitrack_channels, width, height)
+        m_t_minus_1 = m_t_minus_1.reshape(
+            batch_size, track_num * multitrack_channels, width, height
+        )
 
-        assert len_0 == len_1 and len_0 == len_2
+        d_t_input_block = []
+        m_t_input_block = []
+        m_t_minus_1_input_block = []
 
-        for i in range(len_0):
-            for j in range(3):
-                layer = self.input_blocks[j][i]
-                if isinstance(layer, ResBlock):
-                    hs[j] = layer(hs[j], ts[j])
-                elif isinstance(layer, DownSample):
-                    hs[j] = layer(hs[j])
-                else:
-                    raise ValueError("Invalid layer!")
+        d_t_t_emb = self.time_step_embedding(t)
+        d_t_t_emb = self.d_t_time_embed(d_t_t_emb)
+        m_t_t_emb = self.time_step_embedding(t)
+        m_t_t_emb = self.m_t_time_embed(m_t_t_emb)
+        m_t_minus_1_t_emb = self.time_step_embedding(t - 1)
+        m_t_minus_1_t_emb = self.m_t_minus_1_time_embed(m_t_minus_1_t_emb)
+
+        for d_t_module, m_t_module, m_t_minus_1_module in zip(
+            self.d_t_input_blocks, self.m_t_input_blocks, self.m_t_minus_1_input_blocks
+        ):
+            d_t = d_t_module(d_t, d_t_t_emb)
+            d_t_input_block.append(d_t)
+            m_t = m_t_module(m_t, m_t_t_emb)
+            m_t_input_block.append(m_t)
+            m_t_minus_1 = m_t_minus_1_module(m_t_minus_1, m_t_minus_1_t_emb)
+            m_t_minus_1_input_block.append(m_t_minus_1)
+            d_t = self._mask(d_t, m_t, m_t_minus_1)
+
+        d_t = self.d_t_middle_block(d_t, d_t_t_emb)
+        m_t = self.m_t_middle_block(m_t, m_t_t_emb)
+        m_t_minus_1 = self.m_t_minus_1_middle_block(m_t_minus_1, m_t_minus_1_t_emb)
+        d_t = self._mask(d_t, m_t, m_t_minus_1)
+
+        for d_t_module, m_t_module, m_t_minus_1_module in zip(
+            self.d_t_output_blocks,
+            self.m_t_output_blocks,
+            self.m_t_minus_1_output_blocks,
+        ):
+
+            d_t = th.cat([d_t, d_t_input_block.pop()], dim=1)
+            d_t = d_t_module(d_t, d_t_t_emb)
+            m_t = th.cat([m_t, m_t_input_block.pop()], dim=1)
+            m_t = m_t_module(m_t, m_t_t_emb)
+            m_t_minus_1 = th.cat([m_t_minus_1, m_t_minus_1_input_block.pop()], dim=1)
+            m_t_minus_1 = m_t_minus_1_module(m_t_minus_1, m_t_minus_1_t_emb)
+            d_t = self._mask(d_t, m_t, m_t_minus_1)
+
+        return self.drum_out_proj(d_t)

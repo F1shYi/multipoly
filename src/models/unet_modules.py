@@ -521,33 +521,20 @@ class MultitrackSequential(nn.Sequential):
         return x
 
 
-class Proj(nn.Module):
+class DrumSequential(nn.Sequential):
     """
-    Project input `[batch_size, in_channels, width, height]`
-    to output `[batch_size, out_channels, width, height]`
+    ### Sequential block for modules with different inputs
+
+    This sequential module can compose of different modules suck as `ResBlock`,
+    `nn.Conv` and calls them with the matching signatures
     """
 
-    def __init__(self, in_channels, out_channels, channels):
-        super().__init__()
-        self.in_conv = nn.Conv2d(in_channels, channels, kernel_size=3, padding=1)
-        self.convs = nn.Sequential(
-            nn.Conv2d(channels, 4 * channels, kernel_size=3, padding=1),
-            nn.Tanh(),
-            nn.Conv2d(4 * channels, channels, kernel_size=3, padding=1),
-        )
-        self.out_conv = nn.Conv2d(channels, out_channels, kernel_size=3, padding=1)
-        self.skip_conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+    def forward(self, x, t_emb):
+        for layer in self:
 
-    def forward(self, x):
-        """
-        x: `[batch_size, track_num, multitrack_in_channels, width, height]`
+            if isinstance(layer, ResBlock):
+                x = layer(x, t_emb)
+            else:
+                x = layer(x)
 
-        returns:
-        `[batch_size, drum_channels, width, height]`
-        """
-
-        h = F.tanh(self.in_conv(x))
-        h = h + self.convs(h)
-        h = F.tanh(self.out_conv(h))
-        h = F.tanh(h + self.skip_conv(x))
-        return h
+        return x
