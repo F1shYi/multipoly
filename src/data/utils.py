@@ -331,3 +331,39 @@ def midi_to_one_hot_chd(midi_fpath,chd_fpath):
     np_chords = chd_to_onehot(chord)
     os.remove(chd_fpath)
     return np_chords
+
+
+def music_to_drum_matrix(music: muspy.Music):
+    '''
+    Input: 128 step segments
+    Output: width*pitch matrix. 1 channel
+    '''
+    matrix = np.zeros((128,128), dtype=np.float32)
+    for track in music.tracks:
+        if not track.is_drum:
+            continue
+        for note in track.notes:
+            matrix[note.start, note.pitch] = 1.0
+    return matrix
+
+def drum_matrix_to_music(drum_matrix: np.ndarray):
+    '''
+    Input: width(128)*pitch(128) drum matrix, 1 channel
+    Output: music:muspy.Music
+    '''
+    music = muspy.Music(resolution=4, tempos=[muspy.Tempo(0,120)],time_signatures=[muspy.TimeSignature(0,4,4)])
+    track = muspy.Track(is_drum=True, program=0)
+    for start, timestep in enumerate(drum_matrix):
+        for pitch, onset in enumerate(timestep):
+            if onset > 0.0:
+                track.append(
+                    muspy.Note(
+                        time=start,
+                        pitch=pitch,
+                        duration=1,
+                        velocity=64
+                    )
+                )
+    music.tracks = [track]
+    return music
+
