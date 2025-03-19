@@ -1,0 +1,23 @@
+paths:
+  diffusion: "/root/autodl-tmp/multipoly/exp/exp_v3_v1/ckpts/best.pth"
+  chord: "/root/autodl-tmp/multipoly/src/tests/exp/cond_chord.mid"
+  output: "/root/autodl-tmp/multipoly/output/chord_conditioned_0.8/"
+ 
+models:
+  transformers:
+    n_intertrack_head: 4
+    num_intertrack_encoder_layers: 1
+    intertrack_attention_levels:
+    - 2
+    - 3
+
+samples:
+  num_gen: 5
+  scale: 0.8
+  temperature: 1.0
+
+
+
+  
+
+  

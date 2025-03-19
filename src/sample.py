@@ -1,4 +1,4 @@
-from sampler.eight_bar import EightBarSamplerFromChord
+from sampler.eight_bar import EightBarSampler
 import argparse
 import os
 import yaml
@@ -10,7 +10,7 @@ def load_config(config_path):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Parse command-line arguments.")
-    parser.add_argument("--config", type=str, required=False, help="Directory to save config files.", default="src/configs/eight_bar_sample.yaml")
+    parser.add_argument("--config", type=str, required=False, help="Directory to save config files.", default="src/configs/eight_bar_sample_chord.yaml")
     
     args = parser.parse_args()
     
@@ -19,5 +19,5 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     config = load_config(args.config)
-    sampler = EightBarSamplerFromChord(config)
+    sampler = EightBarSampler(config)
     sampler.sample()

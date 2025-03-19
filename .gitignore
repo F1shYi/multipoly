@@ -1,7 +1,7 @@
 polyffusion_ckpts/
 pretrained/
 default_run/
-
+output/
 # local
 /data/
 /pretrained/

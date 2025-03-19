@@ -5,8 +5,8 @@ import os
 import torch
 import numpy as np
 
-class EightBarSampler:
-
+class WholeSongSampler:
+    # TODO: Implement a whole song sampler.
     def __init__(self, config):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.diffusion = get_diffusion_from_ckpts(

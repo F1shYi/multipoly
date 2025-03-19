@@ -15,6 +15,7 @@ from einops import rearrange
 
 
 # ----------------InterTrackModule---------------- #
+
 class InterTrackAttention(nn.Module):
     def __init__(
         self,
@@ -23,7 +24,7 @@ class InterTrackAttention(nn.Module):
         d_intertrack_ff,
         num_intertrack_encoder_layers,
 
-        track_num = 4
+        track_num=4
     ):
         super().__init__()
         encoder = nn.TransformerEncoderLayer(
@@ -36,7 +37,8 @@ class InterTrackAttention(nn.Module):
         self.attention = nn.TransformerEncoder(
             encoder, num_layers=num_intertrack_encoder_layers
         )
-        self.track_embedding = nn.Parameter(torch.randn((1, track_num, d_intertrack_encoder)), requires_grad=True)
+        self.track_embedding = nn.Parameter(torch.randn(
+            (1, track_num, d_intertrack_encoder)), requires_grad=True)
 
     def forward(self, input_tensor):
         """
@@ -44,8 +46,37 @@ class InterTrackAttention(nn.Module):
         Output: a tensor of shape (N, L, C)
         """
 
-        output_tensor = input_tensor + self.attention(input_tensor + self.track_embedding)
+        output_tensor = input_tensor + \
+            self.attention(input_tensor + self.track_embedding)
         return output_tensor
+
+
+class InterTrackConv3d(nn.Module):
+
+    def __init__(self, channels, track_num=4, kernel_size=3):
+        super().__init__()
+        self.conv1 = self._get_conv3d_block(channels, track_num, kernel_size)
+        self.conv2 = self._get_conv3d_block(channels, track_num, kernel_size=5)
+        self.conv3 = self._get_conv3d_block(channels, track_num, kernel_size=7)
+
+    def _get_conv3d_block(self, channels, track_num, kernel_size):
+        return nn.Conv3d(channels, channels*track_num,
+                         (track_num, kernel_size, kernel_size),
+                         stride=1, padding=(0, (kernel_size-1)//2, (kernel_size-1)//2)
+                         )
+
+    def forward(self, input_tensor: torch.Tensor):
+        '''
+        Input: a tensor of shape (B, track_num, channels, width, height)
+        Output: a tensor of same shape.
+        '''
+        b, t, c, w, h = input_tensor.shape
+        # reshape to B, channels, track_num, width, height
+        x = input_tensor.permute(0, 2, 1, 3, 4)
+        x = F.tanh(self.conv1(x)).reshape(b, c, t, w, h)
+        x = F.tanh(self.conv2(x)).reshape(b, c, t, w, h)
+        x = F.tanh(self.conv3(x)).reshape(b, t, c, w, h)
+        return input_tensor + x
 
 
 # ----------------IntraTrackModule---------------- #
@@ -69,7 +100,8 @@ class SpatialTransformer(nn.Module):
             num_groups=32, num_channels=channels, eps=1e-6, affine=True
         )
         # Initial $1 \times 1$ convolution
-        self.proj_in = nn.Conv2d(channels, channels, kernel_size=1, stride=1, padding=0)
+        self.proj_in = nn.Conv2d(
+            channels, channels, kernel_size=1, stride=1, padding=0)
 
         # Transformer layers
         self.transformer_blocks = nn.ModuleList(
@@ -148,7 +180,7 @@ class BasicTransformerBlock(nn.Module):
         x = self.attn2(self.norm2(x), cond=cond) + x
         # Feed-forward network
         x = self.ff(self.norm3(x)) + x
-        
+
         return x
 
 
@@ -266,7 +298,8 @@ class CrossAttention(nn.Module):
         elif self.d_head <= 128:
             pad = 128 - self.d_head
         else:
-            raise ValueError(f"Head size ${self.d_head} too large for Flash Attention")
+            raise ValueError(
+                f"Head size ${self.d_head} too large for Flash Attention")
 
         # Pad the heads
         if pad:
@@ -384,6 +417,7 @@ class UNetModel(nn.Module):
         intertrack_attention_levels: List[int],
         tf_layers: int = 1,
         d_cond: int = 768,
+        use_conv3d=False,
     ):
         """
         :param in_channels: is the number of channels in the input feature map
@@ -416,7 +450,8 @@ class UNetModel(nn.Module):
         # residual blocks accept the feature map and time embedding.
         # `TimestepEmbedSequential` calls them accordingly.
         self.input_blocks.append(
-            TimestepEmbedSequential(nn.Conv2d(in_channels, channels, 3, padding=1))
+            TimestepEmbedSequential(
+                nn.Conv2d(in_channels, channels, 3, padding=1))
         )
         # Number of channels at each block in the input half of U-Net
         input_block_channels = [channels]
@@ -428,12 +463,14 @@ class UNetModel(nn.Module):
             for _ in range(n_res_blocks):
                 # Residual block maps from previous number of channels to the number of
                 # channels in the current level
-                layers = [ResBlock(channels, d_time_emb, out_channels=channels_list[i])]
+                layers = [ResBlock(channels, d_time_emb,
+                                   out_channels=channels_list[i])]
                 channels = channels_list[i]
                 # Add transformer
                 if i in attention_levels:
                     layers.append(
-                        SpatialTransformer(channels, n_heads, tf_layers, d_cond)
+                        SpatialTransformer(
+                            channels, n_heads, tf_layers, d_cond)
                     )
 
                 # Add intertrack attention
@@ -447,6 +484,10 @@ class UNetModel(nn.Module):
                             num_intertrack_encoder_layers=num_intertrack_encoder_layers,
                         )
                     )
+                if use_conv3d:
+                    layers.append(InterTrackConv3d(
+                        channels
+                    ))
 
                 # Add them to the input half of the U-Net and keep track of the number of channels of
                 # its output
@@ -454,7 +495,8 @@ class UNetModel(nn.Module):
                 input_block_channels.append(channels)
             # Down sample at all levels except last
             if i != levels - 1:
-                self.input_blocks.append(TimestepEmbedSequential(DownSample(channels)))
+                self.input_blocks.append(
+                    TimestepEmbedSequential(DownSample(channels)))
                 input_block_channels.append(channels)
 
         # The middle of the U-Net
@@ -484,7 +526,8 @@ class UNetModel(nn.Module):
                 # Add transformer
                 if i in attention_levels:
                     layers.append(
-                        SpatialTransformer(channels, n_heads, tf_layers, d_cond)
+                        SpatialTransformer(
+                            channels, n_heads, tf_layers, d_cond)
                     )
 
                 # Up-sample at every level after last residual block
@@ -502,6 +545,8 @@ class UNetModel(nn.Module):
                             num_intertrack_encoder_layers=num_intertrack_encoder_layers,
                         )
                     )
+                if use_conv3d:
+                    layers.append(InterTrackConv3d(channels))
                 # Add to the output half of the U-Net
                 self.output_blocks.append(TimestepEmbedSequential(*layers))
 
@@ -515,7 +560,7 @@ class UNetModel(nn.Module):
         self.polyffusion_weights_keys = None
         self.other_weights_keys = None
 
-    def load_polyffusion_checkpoints(self, polyffusion_checkpoints: dict, freeze_polyffusion = True, zero = True):
+    def load_polyffusion_checkpoints(self, polyffusion_checkpoints: dict, freeze_polyffusion=True, zero=True):
         print("---------------loading polyffusion weights-------------------")
 
         if zero:
@@ -534,7 +579,8 @@ class UNetModel(nn.Module):
         )
 
         self.other_weights_keys = missing_keys
-        self.polyffusion_weights_keys = [key for key in unet_from_polyffusion_state_dict.keys()]
+        self.polyffusion_weights_keys = [
+            key for key in unet_from_polyffusion_state_dict.keys()]
 
         for key in missing_keys:
             print(key)
@@ -544,19 +590,17 @@ class UNetModel(nn.Module):
         if freeze_polyffusion:
             self._freeze_polyffusion()
             print("Polyffusion weights are freezed.")
-        print("It is expected that missing keys are all intertrack attention modules")
+        print("It is expected that missing keys are all intertrack modules")
 
     def _freeze_polyffusion(self):
         for name, param in self.named_parameters():
             if name in self.polyffusion_weights_keys:
                 param.requires_grad = False
-    
+
     def _unfreeze_polyffusion(self):
         for name, param in self.named_parameters():
             if name in self.polyffusion_weights_keys:
                 param.requires_grad = True
-
-    
 
     def time_step_embedding(self, time_steps: torch.Tensor, max_period: int = 10000):
         """
@@ -628,6 +672,10 @@ class TimestepEmbedSequential(nn.Sequential):
                 x = rearrange(x, "b t c w h -> (b w h) t c")
                 x = layer(x)
                 x = rearrange(x, "(b w h) t c -> b t c w h", b=b, w=w, h=h)
+
+            elif isinstance(layer, InterTrackConv3d):
+
+                x = layer(x)
 
             else:
 

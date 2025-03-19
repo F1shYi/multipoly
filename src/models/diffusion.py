@@ -224,13 +224,17 @@ class Diffusion(nn.Module):
 
         bs, track_num = shape[0], shape[1]
 
+        if uncond_cond is not None:
+            uncond_cond = torch.cat([uncond_cond]*track_num, dim=1).reshape(-1,1,512)
+
+
         cond = None
         if uncond_scale > 0.0:
             single_track_cond = self._encoder_chord(chords)
             cond = torch.cat([single_track_cond]*track_num, dim=1).reshape(-1,1,512)
-        if uncond_cond is not None:
-            uncond_cond = torch.cat([uncond_cond]*track_num, dim=1).reshape(-1,1,512)
-
+        else:
+            cond = -torch.ones_like(uncond_cond)
+        
         x = x_last if x_last is not None else torch.randn(shape, device=self.device)
 
         time_steps = np.flip(self.time_steps)[t_start:]
