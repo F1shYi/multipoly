@@ -36,7 +36,7 @@ class Diffusion(nn.Module):
         self.chord_encoder = chord_encoder
         self.n_steps = n_steps
         self.time_steps = np.asarray(list(range(self.n_steps)), dtype=np.int32)
-        
+
         beta = (
             torch.linspace(
                 linear_start**0.5, linear_end**0.5, n_steps, dtype=torch.float64
@@ -47,11 +47,13 @@ class Diffusion(nn.Module):
         alpha_bar = torch.cumprod(alpha, dim=0)
         self.alpha = nn.Parameter(alpha.to(torch.float32), requires_grad=False)
         self.beta = nn.Parameter(beta.to(torch.float32), requires_grad=False)
-        self.alpha_bar = nn.Parameter(alpha_bar.to(torch.float32), requires_grad=False)
+        self.alpha_bar = nn.Parameter(
+            alpha_bar.to(torch.float32), requires_grad=False)
         self.sigma2 = self.beta
 
         alpha_bar = self.alpha_bar
-        alpha_bar_prev = torch.cat([alpha_bar.new_tensor([1.0]), alpha_bar[:-1]])
+        alpha_bar_prev = torch.cat(
+            [alpha_bar.new_tensor([1.0]), alpha_bar[:-1]])
         self.sqrt_alpha_bar = alpha_bar**0.5
         self.sqrt_1m_alpha_bar = (1.0 - alpha_bar) ** 0.5
         self.sqrt_recip_alpha_bar = alpha_bar**-0.5
@@ -63,11 +65,8 @@ class Diffusion(nn.Module):
             (1.0 - alpha_bar_prev) * ((1 - beta) ** 0.5) / (1.0 - alpha_bar)
         )
 
-
         for params in self.chord_encoder.parameters():
             params.requires_grad = False
-
-
 
     @property
     def device(self):
@@ -105,7 +104,7 @@ class Diffusion(nn.Module):
         x_in = torch.cat([x] * 2)
         t_in = torch.cat([t] * 2)
         c_in = torch.cat([uncond_cond, c])
-        
+
         e_t_uncond, e_t_cond = self.eps_model(x_in, t_in, c_in).chunk(2)
         e_t = e_t_uncond + uncond_scale * (e_t_cond - e_t_uncond)
         return e_t
@@ -126,7 +125,7 @@ class Diffusion(nn.Module):
         return mean + (var**0.5) * eps
 
     def p_sample(
-        self, 
+        self,
         x: torch.Tensor,
         c: torch.Tensor,
         t: torch.Tensor,
@@ -136,27 +135,28 @@ class Diffusion(nn.Module):
         uncond_scale: float = 1.0,
         uncond_cond: Optional[torch.Tensor] = None,
     ):
-        
 
         e_t = self.get_eps(
-                x, t, c, uncond_scale=uncond_scale, uncond_cond=uncond_cond
-            )
-        
-        bs,track_num = x.shape[0],x.shape[1]
+            x, t, c, uncond_scale=uncond_scale, uncond_cond=uncond_cond
+        )
+
+        bs, track_num = x.shape[0], x.shape[1]
 
         sqrt_recip_alpha_bar = x.new_full(
-            (bs,track_num, 1, 1, 1), self.sqrt_recip_alpha_bar[step]
+            (bs, track_num, 1, 1, 1), self.sqrt_recip_alpha_bar[step]
         )
         sqrt_recip_m1_alpha_bar = x.new_full(
-            (bs,track_num, 1, 1, 1), self.sqrt_recip_m1_alpha_bar[step]
+            (bs, track_num, 1, 1, 1), self.sqrt_recip_m1_alpha_bar[step]
         )
 
         x0 = sqrt_recip_alpha_bar * x - sqrt_recip_m1_alpha_bar * e_t
 
-        mean_x0_coef = x.new_full((bs,track_num, 1, 1, 1), self.mean_x0_coef[step])
-        mean_xt_coef = x.new_full((bs,track_num, 1, 1, 1), self.mean_xt_coef[step])
+        mean_x0_coef = x.new_full(
+            (bs, track_num, 1, 1, 1), self.mean_x0_coef[step])
+        mean_xt_coef = x.new_full(
+            (bs, track_num, 1, 1, 1), self.mean_xt_coef[step])
         mean = mean_x0_coef * x0 + mean_xt_coef * x
-        log_var = x.new_full((bs,track_num, 1, 1, 1), self.log_var[step])
+        log_var = x.new_full((bs, track_num, 1, 1, 1), self.log_var[step])
         if step == 0:
             noise = 0
         elif repeat_noise:
@@ -166,8 +166,6 @@ class Diffusion(nn.Module):
         noise = noise * temperature
         x_prev = mean + (0.5 * log_var).exp() * noise
         return x_prev, x0, e_t
-
-        
 
     def loss(
         self,
@@ -185,17 +183,15 @@ class Diffusion(nn.Module):
         xt = self.q_sample(x0, t, eps=noise)
         cond = self._encoder_chord(chord)
 
-        if random.random() < 0.2:
+        if random.random() < 0.6:
             cond = (-torch.ones_like(cond)).to(self.device)
 
-        t = torch.cat([t.reshape(-1,1)]*track_num, dim=1).reshape(-1,)
-        cond = torch.cat([cond]*track_num, dim=1).reshape(-1,1,512)
-        
+        t = torch.cat([t.reshape(-1, 1)]*track_num, dim=1).reshape(-1,)
+        cond = torch.cat([cond]*track_num, dim=1).reshape(-1, 1, 512)
 
         eps_theta = self.eps_model(xt, t, cond)
 
         return F.mse_loss(noise, eps_theta)
-    
 
     @torch.no_grad()
     def sample(
@@ -225,17 +221,19 @@ class Diffusion(nn.Module):
         bs, track_num = shape[0], shape[1]
 
         if uncond_cond is not None:
-            uncond_cond = torch.cat([uncond_cond]*track_num, dim=1).reshape(-1,1,512)
-
+            uncond_cond = torch.cat(
+                [uncond_cond]*track_num, dim=1).reshape(-1, 1, 512)
 
         cond = None
         if uncond_scale > 0.0:
             single_track_cond = self._encoder_chord(chords)
-            cond = torch.cat([single_track_cond]*track_num, dim=1).reshape(-1,1,512)
+            cond = torch.cat([single_track_cond]*track_num,
+                             dim=1).reshape(-1, 1, 512)
         else:
             cond = -torch.ones_like(uncond_cond)
-        
-        x = x_last if x_last is not None else torch.randn(shape, device=self.device)
+
+        x = x_last if x_last is not None else torch.randn(
+            shape, device=self.device)
 
         time_steps = np.flip(self.time_steps)[t_start:]
 
@@ -252,16 +250,15 @@ class Diffusion(nn.Module):
                 uncond_scale=uncond_scale,
                 uncond_cond=uncond_cond,
             )
-            
+
         return x
 
-    
     @torch.no_grad()
     def paint(
         self,
         shape: List[int],
         chords: Optional[torch.Tensor] = None,
-        
+
         *,
         orig: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None,
@@ -270,15 +267,17 @@ class Diffusion(nn.Module):
         repaint_n=1,
         t_start: int = 0,
     ):
-        
+
         bs, track_num = shape[0], shape[1]
 
         cond = None
         if uncond_scale > 0.0:
             single_track_cond = self._encoder_chord(chords)
-            cond = torch.cat([single_track_cond]*track_num, dim=1).reshape(-1,1,512)
+            cond = torch.cat([single_track_cond]*track_num,
+                             dim=1).reshape(-1, 1, 512)
         if uncond_cond is not None:
-            uncond_cond = torch.cat([uncond_cond]*track_num, dim=1).reshape(-1,1,512)
+            uncond_cond = torch.cat(
+                [uncond_cond]*track_num, dim=1).reshape(-1, 1, 512)
 
         x = torch.randn(shape, device=self.device)
 
@@ -289,13 +288,14 @@ class Diffusion(nn.Module):
             x_t = x
             for u in range(repaint_n):
                 noise = (
-                        torch.randn_like(orig, device=orig.device)
-                        if step > 0
-                        else torch.zeros_like(orig, device=orig.device)
-                    )
-                x_kn_tm1 = self.q_sample(orig, torch.tensor(step, device=self.device, dtype=torch.long), eps=noise)   
+                    torch.randn_like(orig, device=orig.device)
+                    if step > 0
+                    else torch.zeros_like(orig, device=orig.device)
+                )
+                x_kn_tm1 = self.q_sample(orig, torch.tensor(
+                    step, device=self.device, dtype=torch.long), eps=noise)
                 ts = x_t.new_full((bs*track_num,), step, dtype=torch.long)
-                
+
                 x_unkn_tm1, _, _ = self.p_sample(
                     x_t,
                     cond,
@@ -312,9 +312,4 @@ class Diffusion(nn.Module):
                         1 - self.beta[step - 1]
                     ) ** 0.5 * x + self.beta[step - 1] * noise
 
-
-                
-
         return x
-
-

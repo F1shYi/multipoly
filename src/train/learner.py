@@ -92,9 +92,6 @@ class Learner:
                                                           config["training"]["decay_factor"],
                                                           config["training"]["decay_interval"])
                                   )
-        self.autocast = torch.autocast(
-            device_type="cuda", dtype=torch.float16, enabled=True)
-        self.scaler = torch.amp.GradScaler("cuda", enabled=True)
         self.writer = SummaryWriter(self.log_dir)
         self.epoch = 0
         self.step = 0
@@ -196,7 +193,7 @@ class Learner:
                 print(
                     f"generating song {gen_idx} for validation segment {seg_idx} at step {self.step}")
 
-                for uncond_scale in [0.0, 0.5, 1.0, 2.0, 5.0]:
+                for uncond_scale in [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]:
 
                     gen_folder = os.path.join(
                         save_folder, f"scale_{uncond_scale}", f"gen_{gen_idx}")
@@ -234,7 +231,7 @@ class Learner:
                     f"generating song {gen_idx} for validation segment {seg_idx} at step {self.step}")
 
                 for keep_idx in [0, 1, 2, 3]:
-                    for uncond_scale in [0.0, 0.5, 1.0, 2.0, 5.0]:
+                    for uncond_scale in [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]:
                         gen_folder = os.path.join(
                             save_folder, f"{NAME[keep_idx]}_scale_{uncond_scale}", f"gen_{gen_idx}")
                         os.makedirs(gen_folder, exist_ok=True)

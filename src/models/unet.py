@@ -56,8 +56,6 @@ class InterTrackConv3d(nn.Module):
     def __init__(self, channels, track_num=4, kernel_size=3):
         super().__init__()
         self.conv1 = self._get_conv3d_block(channels, track_num, kernel_size)
-        self.conv2 = self._get_conv3d_block(channels, track_num, kernel_size=5)
-        self.conv3 = self._get_conv3d_block(channels, track_num, kernel_size=7)
 
     def _get_conv3d_block(self, channels, track_num, kernel_size):
         return nn.Conv3d(channels, channels*track_num,
@@ -73,9 +71,7 @@ class InterTrackConv3d(nn.Module):
         b, t, c, w, h = input_tensor.shape
         # reshape to B, channels, track_num, width, height
         x = input_tensor.permute(0, 2, 1, 3, 4)
-        x = F.tanh(self.conv1(x)).reshape(b, c, t, w, h)
-        x = F.tanh(self.conv2(x)).reshape(b, c, t, w, h)
-        x = F.tanh(self.conv3(x)).reshape(b, t, c, w, h)
+        x = F.tanh(self.conv1(x)).reshape(b, t, c, w, h)
         return input_tensor + x
 
 
