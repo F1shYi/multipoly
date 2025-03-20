@@ -76,8 +76,9 @@ def onehot_to_chd(onehot):
 def onehot_chd_pitch_shift(onehot, shift):
     ret = np.zeros_like(onehot)
     for i in range(3):
-        ret[:, 12*i:12*i +
-            12] = np.roll(onehot[:, 12*i:12*i+12], shift=shift, axis=-1)
+        ret[:, 12 * i : 12 * i + 12] = np.roll(
+            onehot[:, 12 * i : 12 * i + 12], shift=shift, axis=-1
+        )
     return ret
 
 
@@ -209,12 +210,10 @@ def custom_round(x):
         return 0
 
 
-def prmat2c_to_midi_file(
-    prmat2c, fpath, is_custom_round=True
-):
-    '''
+def prmat2c_to_midi_file(prmat2c, fpath, is_custom_round=True):
+    """
     single track prmat2c to midi
-    '''
+    """
     # prmat2c: (2, step, 128)
     if "Tensor" in str(type(prmat2c)):
         prmat2c = prmat2c.cpu().detach().numpy()
@@ -301,6 +300,32 @@ def midi_to_one_hot_chd(midi_fpath, chd_fpath):
 def midi_to_multi_prmat2c(midi_fpath):
     music = muspy.read_midi(midi_fpath)
     multi_prmat_2c = np.zeros((4, 2, 128, 128), dtype=np.float32)
+    for track in music.tracks:
+        if track.is_drum:
+            continue
+        if track.program == 32:
+            track_idx = 0
+        if track.program == 24:
+            track_idx = 1
+        if track.program == 0:
+            track_idx = 2
+        if track.program == 48:
+            track_idx = 3
+        for note in track.notes:
+            start_time = note.start
+            duration = note.duration
+            pitch = note.pitch
+            multi_prmat_2c[track_idx, 0, start_time, pitch] = 1.0
+            for d in range(1, duration):
+                if start_time + d < 128:
+                    multi_prmat_2c[track_idx, 1, start_time + d, pitch] = 1.0
+    return multi_prmat_2c
+
+
+def whole_song_midi_to_multi_prmat2c(midi_fpath):
+    music = muspy.read_midi(midi_fpath)
+    timestep = music.get_end_time()
+    multi_prmat_2c = np.zeros((4, 2, timestep, 128), dtype=np.float32)
     for track in music.tracks:
         if track.is_drum:
             continue
