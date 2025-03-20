@@ -1,7 +1,7 @@
 paths:
   diffusion: "/root/autodl-tmp/multipoly/exp/exp_v3_v1/ckpts/best.pth"
-  chord: "/root/autodl-tmp/multipoly/src/tests/exp/cond_chord.mid"
-  output: "/root/autodl-tmp/multipoly/output/chord_conditioned_0.8/"
+  cond: "/root/autodl-tmp/multipoly/data/val_segs/seg_20939.mid"
+  output: "/root/autodl-tmp/multipoly/exp/exp_v3_v1/output/"
  
 models:
   transformers:
@@ -13,7 +13,6 @@ models:
 
 samples:
   num_gen: 5
-  scale: 0.8
   temperature: 1.0
 
 

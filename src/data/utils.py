@@ -6,6 +6,7 @@ import mir_eval
 import pretty_midi as pm
 import os
 
+
 def get_chord_matrix(fpath):
     """
     chord matrix [M * 14], each line represent the chord of a beat
@@ -42,7 +43,6 @@ def get_chord_matrix(fpath):
     return chords
 
 
-
 def chd_pitch_shift(chd, shift):
     chd = chd.copy()
     chd[:, 0] = (chd[:, 0] + shift) % 12
@@ -50,9 +50,10 @@ def chd_pitch_shift(chd, shift):
     chd[:, -1] = (chd[:, -1] + shift) % 12
     return chd
 
+
 def pr_mat_pitch_shift(pr_mat, shift):
     return np.roll(pr_mat, shift, -1)
-    
+
 
 def chd_to_onehot(chd):
     n_step = chd.shape[0]
@@ -71,11 +72,14 @@ def onehot_to_chd(onehot):
     chd[:, 13] = np.argmax(onehot[:, 24:36], axis=1)
     return chd
 
+
 def onehot_chd_pitch_shift(onehot, shift):
     ret = np.zeros_like(onehot)
     for i in range(3):
-        ret[:, 12*i:12*i+12] = np.roll(onehot[:, 12*i:12*i+12], shift=shift, axis=-1)
+        ret[:, 12*i:12*i +
+            12] = np.roll(onehot[:, 12*i:12*i+12], shift=shift, axis=-1)
     return ret
+
 
 def get_note_matrix(music: muspy.Music, track_dict):
 
@@ -98,10 +102,9 @@ def get_note_matrix(music: muspy.Music, track_dict):
                     track_dict[inst.name],
                 ]
             )
-    
+
     notes.sort(key=lambda x: (x[0], x[1], x[2]))
     return notes
-
 
 
 def get_start_table(notes, db_pos):
@@ -116,6 +119,7 @@ def get_start_table(notes, db_pos):
         start_table[db] = row_cnt
 
     return start_table
+
 
 def get_downbeat_pos_and_filter(music: muspy.Music):
     """
@@ -160,8 +164,6 @@ def get_downbeat_pos_and_filter(music: muspy.Music):
     return db_pos, db_pos_filter
 
 
-
-
 def chd_to_midi_file(chords, output_fpath, one_beat=0.5):
     """
     retrieve midi from chords
@@ -173,7 +175,7 @@ def chd_to_midi_file(chords, output_fpath, one_beat=0.5):
     piano = pm.Instrument(program=piano_program)
     t = 0.0
     for chord in chords:
-        
+
         if chord.shape[0] == 14:
             root = int(chord[0])
             chroma = chord[1:13].astype(int)
@@ -200,53 +202,15 @@ def chd_to_midi_file(chords, output_fpath, one_beat=0.5):
     midi.write(output_fpath)
 
 
-
-def midi_to_npz(midi_fpath, chd_fpath, track_dict = {"Bass":0,"Guitar":1,"Piano":2,"Strings":3}):
-    '''
-    npz: dict with keys "notes", "chords", "start_table", "db_pos", "db_pos_filter"
-
-    notes: N*4 matrix, where N is the number of total notes, each note represented by (onset, pitch, duration, track)
-    chords: M*36 matrix, where M is the number of total beats. Chord represented in one-hot form.
-
-    '''
-    music = muspy.read(midi_fpath)
-    np_notes = np.array(get_note_matrix(music, track_dict))
-    extract_chords_from_midi_file(midi_fpath, chd_fpath)
-    chord = np.array(get_chord_matrix(chd_fpath))
-    np_chords = chd_to_onehot(chord)
-    db_pos, db_pos_filter = get_downbeat_pos_and_filter(music)
-    start_table = get_start_table(np_notes, db_pos)
-
-    npz_file = {
-            "notes": np_notes,
-            "start_table": np.array(start_table),
-            "db_pos": np.array(db_pos),
-            "db_pos_filter": np.array(db_pos_filter),
-            "chord": np_chords,
-        }
-    return npz_file
-
-
-def nmat_to_multi_prmat2c(nmat, n_step,track_num):
-    pr_mat = np.zeros((track_num, 2, n_step, 128), dtype=np.float32)
-    
-    for o, p, d, track_idx in nmat:
-        if o < n_step:
-            pr_mat[track_idx, 0, o, p] = 1.0
-            for dd in range(1, d):
-                if o + dd < n_step:
-                    pr_mat[track_idx, 1, o + dd, p] = 1.0
-
-    return pr_mat
-
 def custom_round(x):
     if x > 0.95 and x < 1.05:
         return 1
     else:
         return 0
 
+
 def prmat2c_to_midi_file(
-    prmat2c, fpath, is_custom_round = True
+    prmat2c, fpath, is_custom_round=True
 ):
     '''
     single track prmat2c to midi
@@ -279,11 +243,12 @@ def prmat2c_to_midi_file(
                     end=(step_ind + dur) * 1 / 8,
                 )
                 origin.notes.append(note)
-    
+
     midi.instruments.append(origin)
     midi.write(fpath)
 
-def multi_prmat2c_to_midi_file(multi_prmat2c, fpath, is_custom_round = True):
+
+def multi_prmat2c_to_midi_file(multi_prmat2c, fpath, is_custom_round=True):
     #         if track.program == 32:
     #             track_idx = 0
     #         if track.program == 24:
@@ -292,11 +257,11 @@ def multi_prmat2c_to_midi_file(multi_prmat2c, fpath, is_custom_round = True):
     #             track_idx = 2
     #         if track.program == 48:
     #             track_idx = 3
-    programs = [32,24,0,48]
+    programs = [32, 24, 0, 48]
     midi = pm.PrettyMIDI()
     for track_idx, program in enumerate(programs):
         prmat2c = multi_prmat2c[track_idx]
-    
+
         instrument = pm.Instrument(program=program, is_drum=False)
         n_step = prmat2c.shape[1]
         onset = prmat2c[0]
@@ -320,14 +285,39 @@ def multi_prmat2c_to_midi_file(multi_prmat2c, fpath, is_custom_round = True):
                         end=(step_ind + dur) * 1 / 8,
                     )
                     instrument.notes.append(note)
-        
+
         midi.instruments.append(instrument)
     midi.write(fpath)
 
 
-def midi_to_one_hot_chd(midi_fpath,chd_fpath):
+def midi_to_one_hot_chd(midi_fpath, chd_fpath):
     extract_chords_from_midi_file(midi_fpath, chd_fpath)
     chord = np.array(get_chord_matrix(chd_fpath))
     np_chords = chd_to_onehot(chord)
     os.remove(chd_fpath)
     return np_chords
+
+
+def midi_to_multi_prmat2c(midi_fpath):
+    music = muspy.read_midi(midi_fpath)
+    multi_prmat_2c = np.zeros((4, 2, 128, 128), dtype=np.float32)
+    for track in music.tracks:
+        if track.is_drum:
+            continue
+        if track.program == 32:
+            track_idx = 0
+        if track.program == 24:
+            track_idx = 1
+        if track.program == 0:
+            track_idx = 2
+        if track.program == 48:
+            track_idx = 3
+        for note in track.notes:
+            start_time = note.start
+            duration = note.duration
+            pitch = note.pitch
+            multi_prmat_2c[track_idx, 0, start_time, pitch] = 1.0
+            for d in range(1, duration):
+                if start_time + d < 128:
+                    multi_prmat_2c[track_idx, 1, start_time + d, pitch] = 1.0
+    return multi_prmat_2c
