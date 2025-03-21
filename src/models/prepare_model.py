@@ -27,8 +27,9 @@ def get_diffusion(polyffusion_ckpts_fpath, chord_encoder_ckpt_fpath, unet_traina
     return diffusion
 
 
-def get_diffusion_from_ckpts(unet_trainable_params, diffusion_ckpts_fpath):
-    unet = UNetModel(**POLYFFUSION_PARAMS_FIXED, **unet_trainable_params)
+def get_diffusion_from_ckpts(unet_trainable_params, diffusion_ckpts_fpath, use_conv3d=False):
+    unet = UNetModel(**POLYFFUSION_PARAMS_FIXED, **
+                     unet_trainable_params, use_conv3d=use_conv3d)
     chord_encoder = ChordEncoder(**CHORD_ENCODER_PARAMS_FIXED)
     diffusion = Diffusion(
         unet_model=unet, chord_encoder=chord_encoder, **DIFFUSION_PARAMS_FIXED)

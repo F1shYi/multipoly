@@ -76,8 +76,8 @@ def onehot_to_chd(onehot):
 def onehot_chd_pitch_shift(onehot, shift):
     ret = np.zeros_like(onehot)
     for i in range(3):
-        ret[:, 12 * i : 12 * i + 12] = np.roll(
-            onehot[:, 12 * i : 12 * i + 12], shift=shift, axis=-1
+        ret[:, 12 * i: 12 * i + 12] = np.roll(
+            onehot[:, 12 * i: 12 * i + 12], shift=shift, axis=-1
         )
     return ret
 
@@ -343,6 +343,6 @@ def whole_song_midi_to_multi_prmat2c(midi_fpath):
             pitch = note.pitch
             multi_prmat_2c[track_idx, 0, start_time, pitch] = 1.0
             for d in range(1, duration):
-                if start_time + d < 128:
+                if start_time + d < timestep:
                     multi_prmat_2c[track_idx, 1, start_time + d, pitch] = 1.0
     return multi_prmat_2c
