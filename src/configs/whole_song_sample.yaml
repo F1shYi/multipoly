@@ -1,6 +1,6 @@
 paths:
   diffusion: "C:\\Users\\19941\\Desktop\\meeting\\exp\\ckpts\\best.pth"
-  cond: "C:\\Courses\\S6\\multipoly\\data\\lpd_5_midi\\139.mid"
+  cond: "C:\\Courses\\S6\\multipoly\\data\\lpd_5_midi\\293.mid"
   output: "./exp/exp_v3_v1/whole_song/"
 
 models:

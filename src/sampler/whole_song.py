@@ -295,9 +295,9 @@ class WholeSongSampler:
 
     def run(
         self,
-        non_ar_chord=False,
-        ar_chord=False,
-        non_ar_chord_track=False,
+        non_ar_chord=True,
+        ar_chord=True,
+        non_ar_chord_track=True,
         ar_chord_track=True,
     ):
         # 1. non-ar chord-only
